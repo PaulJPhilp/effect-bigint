@@ -74,7 +74,6 @@ describe('Basic Regular Expression Constructors', () => {
     expect(buildRegExp('a')).toEqualRegex(new RegExp(/a/))
   })
 
-
   test("single char with flags", {}, () => {
     expect(buildRegExp('a', { global: true }).flags).toBe('g');
     expect(buildRegExp('a', { global: false }).flags).toBe('');

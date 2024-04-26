@@ -27,12 +27,13 @@ export interface Reference extends RegexConstruct {
  * - in the regex itself, through {@link ref}
  */
 export function capture(sequence: RegexSequence, options?: CaptureOptions): Capture {
-  return {
+  const result: Capture = {
     type: 'capture',
     children: ensureArray(sequence),
-    options,
-    encode: encodeCapture,
-  };
+    encode: encodeCapture
+  }
+  if ( options !== undefined) result.options = options
+  return result
 }
 
 /**
