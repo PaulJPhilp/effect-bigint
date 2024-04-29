@@ -1,9 +1,5 @@
 import type { EncodeResult } from './encoder/types.js';
-
-import type * as RegexBuilder from "../../RegexBuilder.ts"
-
 export type ArrayOrSingle<T> = T[] | T;
-
 
 
 /**
@@ -22,6 +18,7 @@ export type RegexElement = RegexConstruct | string | RegExp;
  * Common interface for all regex constructs like character classes, quantifiers, and anchors.
  */
 export interface RegexConstruct {
+  _tag: string,
   type: string;
   encode(): EncodeResult;
 }

@@ -4,18 +4,19 @@
 
 import * as Arr from "./Array.js"
 import type * as _Cache from "./Cache.js"
-//import type * as Effect from "./Effect.js"
-//import type * as Exit from "./Exit.js"
-import { type Pipeable, pipeArguments } from "./Pipeable.js"
 import * as Equal from "./Equal.js"
 import { format, type Inspectable, NodeInspectSymbol } from "./Inspectable.js"
 import { hasProperty } from "./Predicate.js"
-//import * as equivalence from "./Equivalence.js"
 import * as Hash from "./Hash.js"
 import type { Mutable } from "./Types.js"
 import { pipe } from "./Function.js"
 
 import * as internal from "./internal/regexBuilder/index.js"
+
+// Types
+import { encodeSequence } from './internal/regexBuilder/encoder/encoder.js';
+import { ensureArray } from './internal/regexBuilder/utils/elements.js';
+import { RegexSequence } from "./internal/regexBuilder/index.js"
 
 export type ArrayOrSingle<T> = T[] | T;
 
@@ -31,14 +32,7 @@ export const RegexBuilderTypeId: unique symbol = internal.RegexBuilderTypeId
  */
 export type RegexBuilderTypeId = typeof RegexBuilderTypeId
 
-import type { EncodeResult } from './internal/regexBuilder/encoder/types.ts';
-
-/**
- * Sequence of regex elements forming a regular expression.
- *
- * For developer convenience it also accepts a single element instead of array.
- */
-export type RegexSequence = ArrayOrSingle<RegexElement>
+import type { EncodeResult } from './internal/regexBuilder/encoder/types.js';
 
 /**
  * Fundamental building block of a regular expression, defined as either a regex construct or a string.
@@ -73,24 +67,24 @@ export interface RegexFlags {
  * @since 2.0.0
  * @category models
  */
-export interface RegexBuilder<A extends RegexSequence, E extends Error, R extends RegExp> extends Pipeable, Equal.Equal, Inspectable {
+export interface RegexBuilder extends Equal.Equal, Inspectable {
   readonly _tag: "RegexBuilder"
   readonly [RegexBuilderTypeId]: RegexBuilderTypeId
   readonly sequence: Readonly<RegexSequence>
   readonly flags: Readonly<RegexFlags>
 }
 
-const RegexBuilderProto: Omit<RegexBuilder<RegexSequence, Error, RegExp>, "sequence" | "flags"> = {
+const RegexBuilderProto: Omit<RegexBuilder, "sequence" | "flags"> = {
 
   _tag: "RegexBuilder",
 
   [RegexBuilderTypeId]: RegexBuilderTypeId,
 
-  [Equal.symbol](this: RegexBuilder<RegexSequence, Error, RegExp>, that: unknown) {
+  [Equal.symbol](this: RegexBuilder, that: unknown) {
     return isRegexBuilder(that) && Equal.equals(this, that)
   },
 
-  [Hash.symbol](this: RegexBuilder<RegexSequence, Error, RegExp>): number {
+  [Hash.symbol](this: RegexBuilder): number {
     return pipe(
       Array.isArray(this.sequence) ? Hash.array(Arr.fromIterable(this.sequence)) :
         (typeof this.sequence === "object") ? Hash.structure(this.sequence) :
@@ -99,19 +93,16 @@ const RegexBuilderProto: Omit<RegexBuilder<RegexSequence, Error, RegExp>, "seque
       Hash.combine(Hash.structure(this.flags))
     )
   },
-  toString(this: RegexBuilder<RegexSequence, Error, RegExp>) {
+  toString(this: RegexBuilder) {
     return format(this.toJSON())
   },
-  toJSON(this: RegexBuilder<RegexSequence, Error, RegExp>) {
+  toJSON(this: RegexBuilder) {
     return {
       _id: "RegexBuilder"
     }
   },
-  [NodeInspectSymbol](this: RegexBuilder<RegexSequence, Error, RegExp>) {
+  [NodeInspectSymbol](this: RegexBuilder) {
     return this.toJSON()
-  },
-  pipe() {
-    return pipeArguments(this, arguments)
   }
 } as const
 
@@ -123,7 +114,7 @@ const RegexBuilderProto: Omit<RegexBuilder<RegexSequence, Error, RegExp>, "seque
  * @since 2.0.0
  * @category guards
  */
-export const isRegexBuilder = (u: unknown): u is RegexBuilder<RegexSequence, Error, RegExp> => hasProperty(u, RegexBuilderTypeId)
+export const isRegexBuilder = (u: unknown): u is RegexBuilder => hasProperty(u, RegexBuilderTypeId)
 
 /**
  * Creates a `RegexBuilder` instance from.
@@ -139,44 +130,12 @@ export const make = ({
 }: {
   readonly sequence: RegexSequence
   readonly flags: RegexFlags
-}): RegexBuilder<RegexSequence, Error, RegExp> => {
-  const o: Mutable<RegexBuilder<RegexSequence, Error, RegExp>> = Object.create(RegexBuilderProto)
+}): RegexBuilder => {
+  const o: Mutable<RegexBuilder> = Object.create(RegexBuilderProto)
   o.sequence = sequence
   o.flags = flags
   return o
 }
-
-
-/**
- * Parses a cron expression into a `Cron` instance.
- *
- * @param cron - The cron expression to parse.
- *
- * @example
- * import * as Cron from "effect/Cron"
- * import * as Either from "effect/Either"
- *
- * // At 04:00 on every day-of-month from 8 through 14.
- * assert.deepStrictEqual(Cron.parse("0 4 8-14 * *"), Either.right(Cron.make({
- *   minutes: [0],
- *   hours: [4],
- *   days: [8, 9, 10, 11, 12, 13, 14],
- *   months: [],
- *   weekdays: []
- * })))
- *
- * @since 2.0.0
- * @category constructors
- */
-export const build = (sequence: RegexSequence, flags: RegexFlags): RegExp => {
-  const pattern = encodeSequence(ensureArray(sequence)).pattern;
-  const flagsString = encodeFlags(flags ?? {});
-  return new RegExp(pattern, flagsString)
-}
-
-// Types
-import { encodeSequence } from './internal/regexBuilder/encoder/encoder.js';
-import { ensureArray } from './internal/regexBuilder/utils/elements.js';
 
 /**
  * Generate RegExp object from elements with optional flags.
@@ -185,10 +144,14 @@ import { ensureArray } from './internal/regexBuilder/utils/elements.js';
  * @param flags RegExp flags object
  * @returns RegExp object
  *
-export function buildRegExp(sequence: RegexSequence, flags?: RegexFlags): RegExp {
-
+ * @since 2.0.0
+ * @category constructors
+ */
+export const buildRegex = (elements: RegexSequence, flags: RegexFlags): RegExp => {
+  const pattern = encodeSequence(ensureArray(elements)).pattern;
+  const flagsString = encodeFlags(flags ?? {});
+  return new RegExp(pattern, flagsString)
 }
-***/
 
 /**
  * Generate regex pattern from elements.
@@ -281,22 +244,23 @@ export {
 
 const numeric = charRange("0", "9")
 const upperCase = charRange("A", "Z")
-const invalidCanadianChars = regex("DFIOQU")
-const validCanadianFirstChar = charClass(charRange("A", "V"), anyOf("XY"))
+const invalidCanadianChars = regex([anyOf("DFIOQU")])
+const validCanadianFirstChar = anyOf("ACEGHJKLMNPRSTVXY")
 
 //const usZipcode_regex = /^[0-9]{5}(?:-[0-9]{4})?$/
-const usZipcode = build([
+const usZipcode = buildRegex([
   repeat(numeric, 5),
   optional(
     capture(
       regex([
-        "-",
+       "-",
         repeat(numeric, 4)
       ])
     ))
-  ], {})
+], {})
+  
 //const canZipcode_regex = /^(?!.*[DFIOQU])[A-VXY][0-9][A-Z]●?[0-9][A-Z][0-9]$/
-const canZipcode = build([
+const canZipcode = buildRegex([
   startOfString,
   negativeLookahead([
     zeroOrMore(any),
@@ -312,10 +276,8 @@ const canZipcode = build([
 ], {})
 
 //const ukZipcode_regex = /^[A-Z]{1,2}[0-9R][0-9A-Z]?●[0-9][ABD-HJLNP-UW-Z]{2}$/
-
 const uk_regex = repeat(["ABD-HJLNP-UW-Z"], 2)
-
-const ukZipcode = build([
+const ukZipcode = buildRegex([
   startOfString,
   repeat(upperCase, { min: 1, max: 2 }),
   regex([digit, "R"]),
@@ -329,7 +291,7 @@ import { Match } from "effect"
 const match = Match.type< string >().pipe(
   Match.when((input) => usZipcode.test(input), (_) => "US" ),
   Match.when((input) => ukZipcode.test(input), (_) => "UK" ),
-  Match.when((input) => canZipcode.test(input), (_) => "CAN" ),
+  Match.when((input) => canZipcode.test(input) , (_) => "CAN") ,
   Match.option
 )
  
@@ -339,7 +301,7 @@ if (test0._tag == "Some")
 else
   console.log("NO MATCH")
 
-const test1 = match("M6A 0K2")
+const test1 = match("M6K 0A2")
 if (test1._tag == "Some")
   console.log("MATCH: %s", test1.value)
 else
