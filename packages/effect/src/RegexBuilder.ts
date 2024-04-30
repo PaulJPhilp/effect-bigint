@@ -147,7 +147,7 @@ export const make = ({
  * @since 2.0.0
  * @category constructors
  */
-export const buildRegex = (elements: RegexSequence, flags: RegexFlags): RegExp => {
+export const buildRegex = (elements: RegexSequence, flags?: RegexFlags): RegExp => {
   const pattern = encodeSequence(ensureArray(elements)).pattern;
   const flagsString = encodeFlags(flags ?? {});
   return new RegExp(pattern, flagsString)
@@ -237,78 +237,3 @@ export {
   wordBoundary,
   zeroOrMore,
 }
-
-/***
- *** Zipcode Matcher
- ***/
-
-const numeric = charRange("0", "9")
-const upperCase = charRange("A", "Z")
-const invalidCanadianChars = regex([anyOf("DFIOQU")])
-const validCanadianFirstChar = anyOf("ACEGHJKLMNPRSTVXY")
-
-//const usZipcode_regex = /^[0-9]{5}(?:-[0-9]{4})?$/
-const usZipcode = buildRegex([
-  repeat(numeric, 5),
-  optional(
-    capture(
-      regex([
-       "-",
-        repeat(numeric, 4)
-      ])
-    ))
-], {})
-  
-//const canZipcode_regex = /^(?!.*[DFIOQU])[A-VXY][0-9][A-Z]●?[0-9][A-Z][0-9]$/
-const canZipcode = buildRegex([
-  startOfString,
-  negativeLookahead([
-    zeroOrMore(any),
-    invalidCanadianChars
-  ]),
-  validCanadianFirstChar,
-  digit,
-  upperCase,
-  whitespace,
-  digit,
-  upperCase,
-  digit
-], {})
-
-//const ukZipcode_regex = /^[A-Z]{1,2}[0-9R][0-9A-Z]?●[0-9][ABD-HJLNP-UW-Z]{2}$/
-const uk_regex = repeat(["ABD-HJLNP-UW-Z"], 2)
-const ukZipcode = buildRegex([
-  startOfString,
-  repeat(upperCase, { min: 1, max: 2 }),
-  regex([digit, "R"]),
-  charClass(digit, upperCase),
-  digit,
-  uk_regex
-], {global: true})
-
-import { Match } from "effect"
- 
-const match = Match.type< string >().pipe(
-  Match.when((input) => usZipcode.test(input), (_) => "US" ),
-  Match.when((input) => ukZipcode.test(input), (_) => "UK" ),
-  Match.when((input) => canZipcode.test(input) , (_) => "CAN") ,
-  Match.option
-)
- 
-const test0 = match("90210")
-if (test0._tag == "Some")
-  console.log("MATCH: %s", test0.value)
-else
-  console.log("NO MATCH")
-
-const test1 = match("M6K 0A2")
-if (test1._tag == "Some")
-  console.log("MATCH: %s", test1.value)
-else
-  console.log("NO MATCH")
-
-const test2 = match("hello")
-if (test2._tag == "Some")
-  console.log("MATCH: %s", test2.value)
-else
-  console.log("NO MATCH")
