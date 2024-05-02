@@ -16,7 +16,7 @@ import * as internal from "./internal/regexBuilder/index.js"
 // Types
 import { encodeSequence } from './internal/regexBuilder/encoder/encoder.js';
 import { ensureArray } from './internal/regexBuilder/utils/elements.js';
-import { RegexSequence } from "./internal/regexBuilder/index.js"
+import { RegexSequence, RegexFlags } from "./internal/regexBuilder/index.js"
 
 export type ArrayOrSingle<T> = T[] | T;
 
@@ -45,20 +45,6 @@ export type RegexElement = RegexConstruct | string | RegExp;
 export interface RegexConstruct {
   type: string;
   encode(): EncodeResult;
-}
-
-export interface RegexFlags {
-  /** Find all matches in a string, instead of just the first one. */
-  global?: boolean;
-
-  /** Perform case-insensitive matching. */
-  ignoreCase?: boolean;
-
-  /** Treat the start and end of each line in a string as the beginning and end of the string. */
-  multiline?: boolean;
-
-  /** Penerate the start and end indices of each captured group in a match. */
-  hasIndices?: boolean;
 }
 
 /**
@@ -163,17 +149,21 @@ export function buildPattern(sequence: RegexSequence): string {
 }
 
 function encodeFlags(flags: RegexFlags): string {
+  console.log('encodeFlags(%s)', flags)
   let result = '';
 
   if (flags.global) result += 'g';
   if (flags.ignoreCase) result += 'i';
   if (flags.multiline) result += 'm';
   if (flags.hasIndices) result += 'd';
+  if (flags.dotAll) result += 's';
+  if (flags.sticky) result += 'y';
 
   return result;
 }
 
-import type { CaptureOptions, ref } from './internal/regexBuilder/constructs/capture.ts';
+import type { CaptureOptions } from './internal/regexBuilder/constructs/capture.ts';
+import { ref }  from './internal/regexBuilder/constructs/capture.js';
 import { capture } from './internal/regexBuilder/constructs/capture.js';
 export type { QuantifierOptions } from './internal/regexBuilder/constructs/quantifiers.ts';
 export type { RepeatOptions } from './internal/regexBuilder/constructs/repeat.ts';
