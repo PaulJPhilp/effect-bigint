@@ -25,16 +25,17 @@ import type * as Random from "../Random.js"
 import * as Ref from "../Ref.js"
 import type * as runtimeFlagsPatch from "../RuntimeFlagsPatch.js"
 import * as Tracer from "../Tracer.js"
-import type { MergeRecord } from "../Types.js"
+import type { NoInfer } from "../Types.js"
+import { yieldWrapGet } from "../Utils.js"
 import * as internalCause from "./cause.js"
 import { clockTag } from "./clock.js"
 import * as core from "./core.js"
 import * as defaultServices from "./defaultServices.js"
+import * as doNotation from "./doNotation.js"
 import * as fiberRefsPatch from "./fiberRefs/patch.js"
 import type { FiberRuntime } from "./fiberRuntime.js"
 import * as metricLabel from "./metric/label.js"
 import * as runtimeFlags from "./runtimeFlags.js"
-import * as SingleShotGen from "./singleShotGen.js"
 import * as internalTracer from "./tracer.js"
 
 /* @internal */
@@ -369,56 +370,39 @@ export const Do: Effect.Effect<{}> = core.succeed({})
 
 /* @internal */
 export const bind: {
-  <N extends string, K, A, E2, R2>(
-    tag: Exclude<N, keyof K>,
-    f: (_: K) => Effect.Effect<A, E2, R2>
-  ): <E, R>(self: Effect.Effect<K, E, R>) => Effect.Effect<MergeRecord<K, { [k in N]: A }>, E2 | E, R2 | R>
-  <K, E, R, N extends string, A, E2, R2>(
-    self: Effect.Effect<K, E, R>,
-    tag: Exclude<N, keyof K>,
-    f: (_: K) => Effect.Effect<A, E2, R2>
-  ): Effect.Effect<MergeRecord<K, { [k in N]: A }>, E2 | E, R2 | R>
-} = dual(3, <K, E, R, N extends string, A, E2, R2>(
-  self: Effect.Effect<K, E, R>,
-  tag: Exclude<N, keyof K>,
-  f: (_: K) => Effect.Effect<A, E2, R2>
-): Effect.Effect<MergeRecord<K, { [k in N]: A }>, E2 | E, R2 | R> =>
-  core.flatMap(self, (k) =>
-    core.map(
-      f(k),
-      (a): MergeRecord<K, { [k in N]: A }> => ({ ...k, [tag]: a } as any)
-    )))
+  <N extends string, A extends object, B, E2, R2>(
+    name: Exclude<N, keyof A>,
+    f: (a: A) => Effect.Effect<B, E2, R2>
+  ): <E1, R1>(
+    self: Effect.Effect<A, E1, R1>
+  ) => Effect.Effect<{ [K in N | keyof A]: K extends keyof A ? A[K] : B }, E2 | E1, R2 | R1>
+  <A extends object, N extends string, E1, R1, B, E2, R2>(
+    self: Effect.Effect<A, E1, R1>,
+    name: Exclude<N, keyof A>,
+    f: (a: A) => Effect.Effect<B, E2, R2>
+  ): Effect.Effect<{ [K in N | keyof A]: K extends keyof A ? A[K] : B }, E1 | E2, R1 | R2>
+} = doNotation.bind<Effect.EffectTypeLambda>(core.map, core.flatMap)
 
 /* @internal */
 export const bindTo: {
-  <N extends string>(tag: N): <A, E, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<Record<N, A>, E, R>
-  <A, E, R, N extends string>(self: Effect.Effect<A, E, R>, tag: N): Effect.Effect<Record<N, A>, E, R>
-} = dual(
-  2,
-  <A, E, R, N extends string>(self: Effect.Effect<A, E, R>, tag: N): Effect.Effect<Record<N, A>, E, R> =>
-    core.map(self, (a) => ({ [tag]: a } as Record<N, A>))
-)
+  <N extends string>(name: N): <A, E, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<{ [K in N]: A }, E, R>
+  <A, E, R, N extends string>(self: Effect.Effect<A, E, R>, name: N): Effect.Effect<{ [K in N]: A }, E, R>
+} = doNotation.bindTo<Effect.EffectTypeLambda>(core.map)
 
 /* @internal */
 export const let_: {
-  <N extends string, K, A>(
-    tag: Exclude<N, keyof K>,
-    f: (_: K) => A
-  ): <E, R>(self: Effect.Effect<K, E, R>) => Effect.Effect<MergeRecord<K, { [k in N]: A }>, E, R>
-  <K, E, R, N extends string, A>(
-    self: Effect.Effect<K, E, R>,
-    tag: Exclude<N, keyof K>,
-    f: (_: K) => A
-  ): Effect.Effect<MergeRecord<K, { [k in N]: A }>, E, R>
-} = dual(3, <K, E, R, N extends string, A>(
-  self: Effect.Effect<K, E, R>,
-  tag: Exclude<N, keyof K>,
-  f: (_: K) => A
-): Effect.Effect<MergeRecord<K, { [k in N]: A }>, E, R> =>
-  core.map(
-    self,
-    (k): MergeRecord<K, { [k in N]: A }> => ({ ...k, [tag]: f(k) } as any)
-  ))
+  <N extends string, A extends object, B>(
+    name: Exclude<N, keyof A>,
+    f: (a: A) => B
+  ): <E, R>(
+    self: Effect.Effect<A, E, R>
+  ) => Effect.Effect<{ [K in N | keyof A]: K extends keyof A ? A[K] : B }, E, R>
+  <A extends object, N extends string, E, R, B>(
+    self: Effect.Effect<A, E, R>,
+    name: Exclude<N, keyof A>,
+    f: (a: A) => B
+  ): Effect.Effect<{ [K in N | keyof A]: K extends keyof A ? A[K] : B }, E, R>
+} = doNotation.let_<Effect.EffectTypeLambda>(core.map)
 
 /* @internal */
 export const dropUntil: {
@@ -774,23 +758,6 @@ export const forever = <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<ne
   return loop
 }
 
-/** @internal */
-class EffectGen {
-  constructor(readonly value: Effect.Effect<any, any, any>) {
-  }
-  [Symbol.iterator]() {
-    return new SingleShotGen.SingleShotGen(this)
-  }
-}
-
-const adapter = function() {
-  let x = arguments[0]
-  for (let i = 1; i < arguments.length; i++) {
-    x = arguments[i](x)
-  }
-  return new EffectGen(x) as any
-}
-
 /**
  * Inspired by https://github.com/tusharmath/qio/pull/22 (revised)
   @internal */
@@ -802,16 +769,15 @@ export const gen: typeof Effect.gen = function() {
     f = arguments[1].bind(arguments[0])
   }
   return core.suspend(() => {
-    const iterator = f(adapter)
+    const iterator = f(pipe)
     const state = iterator.next()
     const run = (
       state: IteratorYieldResult<any> | IteratorReturnResult<any>
-    ): Effect.Effect<any, any, any> => (state.done
-      ? core.succeed(state.value)
-      : pipe(
-        state.value.value as unknown as Effect.Effect<any, any, any>,
-        core.flatMap((val: any) => run(iterator.next(val)))
-      ))
+    ): Effect.Effect<any, any, any> => {
+      return (state.done
+        ? core.succeed(state.value)
+        : core.flatMap(yieldWrapGet(state.value) as any, (val: any) => run(iterator.next(val))))
+    }
     return run(state)
   })
 }
@@ -2045,13 +2011,7 @@ const bigint0 = BigInt(0)
 export const unsafeMakeSpan = <XA, XE>(
   fiber: FiberRuntime<XA, XE>,
   name: string,
-  options?: {
-    readonly attributes?: Record<string, unknown> | undefined
-    readonly links?: ReadonlyArray<Tracer.SpanLink> | undefined
-    readonly parent?: Tracer.AnySpan | undefined
-    readonly root?: boolean | undefined
-    readonly context?: Context.Context<never> | undefined
-  }
+  options?: Tracer.SpanOptions
 ) => {
   const enabled = fiber.getFiberRef(core.currentTracerEnabled)
   if (enabled === false) {
@@ -2089,7 +2049,8 @@ export const unsafeMakeSpan = <XA, XE>(
     parent,
     options?.context ?? Context.empty(),
     links,
-    timingEnabled ? clock.unsafeCurrentTimeNanos() : bigint0
+    timingEnabled ? clock.unsafeCurrentTimeNanos() : bigint0,
+    options?.kind ?? "internal"
   )
 
   if (annotationsFromEnv._tag === "Some") {
@@ -2105,13 +2066,7 @@ export const unsafeMakeSpan = <XA, XE>(
 /** @internal */
 export const makeSpan = (
   name: string,
-  options?: {
-    readonly attributes?: Record<string, unknown> | undefined
-    readonly links?: ReadonlyArray<Tracer.SpanLink> | undefined
-    readonly parent?: Tracer.AnySpan | undefined
-    readonly root?: boolean | undefined
-    readonly context?: Context.Context<never> | undefined
-  }
+  options?: Tracer.SpanOptions
 ): Effect.Effect<Tracer.Span> => core.withFiberRuntime((fiber) => core.succeed(unsafeMakeSpan(fiber, name, options)))
 
 /* @internal */
@@ -2125,13 +2080,11 @@ export const spanLinks: Effect.Effect<Chunk.Chunk<Tracer.SpanLink>> = core
 /** @internal */
 export const useSpan: {
   <A, E, R>(name: string, evaluate: (span: Tracer.Span) => Effect.Effect<A, E, R>): Effect.Effect<A, E, R>
-  <A, E, R>(name: string, options: {
-    readonly attributes?: Record<string, unknown> | undefined
-    readonly links?: ReadonlyArray<Tracer.SpanLink> | undefined
-    readonly parent?: Tracer.AnySpan | undefined
-    readonly root?: boolean | undefined
-    readonly context?: Context.Context<never> | undefined
-  }, evaluate: (span: Tracer.Span) => Effect.Effect<A, E, R>): Effect.Effect<A, E, R>
+  <A, E, R>(
+    name: string,
+    options: Tracer.SpanOptions,
+    evaluate: (span: Tracer.Span) => Effect.Effect<A, E, R>
+  ): Effect.Effect<A, E, R>
 } = <A, E, R>(
   name: string,
   ...args: [evaluate: (span: Tracer.Span) => Effect.Effect<A, E, R>] | [
@@ -2139,13 +2092,7 @@ export const useSpan: {
     evaluate: (span: Tracer.Span) => Effect.Effect<A, E, R>
   ]
 ) => {
-  const options: {
-    readonly attributes?: Record<string, unknown> | undefined
-    readonly links?: ReadonlyArray<Tracer.SpanLink> | undefined
-    readonly parent?: Tracer.AnySpan | undefined
-    readonly root?: boolean | undefined
-    readonly context?: Context.Context<never> | undefined
-  } | undefined = args.length === 1 ? undefined : args[0]
+  const options: Tracer.SpanOptions | undefined = args.length === 1 ? undefined : args[0]
   const evaluate: (span: Tracer.Span) => Effect.Effect<A, E, R> = args[args.length - 1]
 
   return core.withFiberRuntime<A, E, R>((fiber) => {
@@ -2172,20 +2119,15 @@ export const withParentSpan = dual<
 
 /** @internal */
 export const withSpan = dual<
-  (name: string, options?: {
-    readonly attributes?: Record<string, unknown> | undefined
-    readonly links?: ReadonlyArray<Tracer.SpanLink> | undefined
-    readonly parent?: Tracer.AnySpan | undefined
-    readonly root?: boolean | undefined
-    readonly context?: Context.Context<never> | undefined
-  }) => <A, E, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A, E, Exclude<R, Tracer.ParentSpan>>,
-  <A, E, R>(self: Effect.Effect<A, E, R>, name: string, options?: {
-    readonly attributes?: Record<string, unknown> | undefined
-    readonly links?: ReadonlyArray<Tracer.SpanLink> | undefined
-    readonly parent?: Tracer.AnySpan | undefined
-    readonly root?: boolean | undefined
-    readonly context?: Context.Context<never> | undefined
-  }) => Effect.Effect<A, E, Exclude<R, Tracer.ParentSpan>>
+  (
+    name: string,
+    options?: Tracer.SpanOptions
+  ) => <A, E, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A, E, Exclude<R, Tracer.ParentSpan>>,
+  <A, E, R>(
+    self: Effect.Effect<A, E, R>,
+    name: string,
+    options?: Tracer.SpanOptions
+  ) => Effect.Effect<A, E, Exclude<R, Tracer.ParentSpan>>
 >(
   (args) => typeof args[0] !== "string",
   (self, name, options) =>

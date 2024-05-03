@@ -72,14 +72,23 @@ export class StatementPrimitive<A> extends Effectable.Class<ReadonlyArray<A>, Er
   constructor(
     readonly segments: ReadonlyArray<Statement.Segment>,
     readonly acquirer: Connection.Connection.Acquirer,
-    readonly compiler: Statement.Compiler
+    readonly compiler: Statement.Compiler,
+    readonly spanAttributes: ReadonlyArray<readonly [string, unknown]>
   ) {
     super()
   }
 
-  get withoutTransform(): Effect.Effect<ReadonlyArray<A>, Error.SqlError> {
+  private withConnection<XA, E>(
+    operation: string,
+    f: (
+      connection: Connection.Connection,
+      sql: string,
+      params: ReadonlyArray<Statement.Primitive>
+    ) => Effect.Effect<XA, E>
+  ): Effect.Effect<XA, E | Error.SqlError> {
     return Effect.useSpan(
       "sql.execute",
+      { kind: "client" },
       (span) =>
         Effect.withFiberRuntime((fiber) => {
           const transform = fiber.getFiberRef(currentTransformer)
@@ -87,16 +96,26 @@ export class StatementPrimitive<A> extends Effectable.Class<ReadonlyArray<A>, Er
             ? transform.value(this, make(this.acquirer, this.compiler), fiber.getFiberRefs(), span)
             : this
           const [sql, params] = statement.compile()
-          span.attribute("sql.method", "executeWithoutTransform")
-          span.attribute("sql.query", sql)
-          return Effect.scoped(Effect.flatMap(this.acquirer, (_) => _.executeWithoutTransform(sql, params)))
+          for (const [key, value] of this.spanAttributes) {
+            span.attribute(key, value)
+          }
+          span.attribute("db.operation.name", operation)
+          span.attribute("db.query.text", sql)
+          return Effect.scoped(Effect.flatMap(this.acquirer, (_) => f(_, sql, params)))
         })
+    )
+  }
+
+  get withoutTransform(): Effect.Effect<ReadonlyArray<A>, Error.SqlError> {
+    return this.withConnection(
+      "executeWithoutTransform",
+      (connection, sql, params) => connection.executeWithoutTransform(sql, params)
     )
   }
 
   get stream(): Stream.Stream<A, Error.SqlError> {
     return Stream.unwrapScoped(Effect.flatMap(
-      Effect.makeSpanScoped("sql.execute"),
+      Effect.makeSpanScoped("sql.execute", { kind: "client" }),
       (span) =>
         Effect.withFiberRuntime<Stream.Stream<A, Error.SqlError>, Error.SqlError, Scope>((fiber) => {
           const transform = fiber.getFiberRef(currentTransformer)
@@ -104,8 +123,11 @@ export class StatementPrimitive<A> extends Effectable.Class<ReadonlyArray<A>, Er
             ? transform.value(this, make(this.acquirer, this.compiler), fiber.getFiberRefs(), span)
             : this
           const [sql, params] = statement.compile()
-          span.attribute("sql.method", "executeStream")
-          span.attribute("sql.query", sql)
+          for (const [key, value] of this.spanAttributes) {
+            span.attribute(key, value)
+          }
+          span.attribute("db.operation.name", "executeStream")
+          span.attribute("db.query.text", sql)
           return Effect.map(this.acquirer, (_) => _.executeStream(sql, params))
         })
     ))
@@ -115,20 +137,11 @@ export class StatementPrimitive<A> extends Effectable.Class<ReadonlyArray<A>, Er
     ReadonlyArray<ReadonlyArray<Statement.Primitive>>,
     Error.SqlError
   > {
-    return Effect.useSpan(
-      "sql.execute",
-      (span) =>
-        Effect.withFiberRuntime((fiber) => {
-          const transform = fiber.getFiberRef(currentTransformer)
-          const statement = transform._tag === "Some"
-            ? transform.value(this, make(this.acquirer, this.compiler), fiber.getFiberRefs(), span)
-            : this
-          const [sql, params] = statement.compile()
-          span.attribute("sql.method", "executeValues")
-          span.attribute("sql.query", sql)
-          return Effect.scoped(Effect.flatMap(this.acquirer, (_) => _.executeValues(sql, params)))
-        })
-    )
+    return this.withConnection("executeValues", (connection, sql, params) => connection.executeValues(sql, params))
+  }
+
+  get unprepared(): Effect.Effect<ReadonlyArray<A>, Error.SqlError> {
+    return this.withConnection("executeRaw", (connection, sql, params) => connection.executeRaw(sql, params))
   }
 
   private _compiled: readonly [string, ReadonlyArray<Statement.Primitive>] | undefined = undefined
@@ -139,20 +152,7 @@ export class StatementPrimitive<A> extends Effectable.Class<ReadonlyArray<A>, Er
     return this._compiled = this.compiler.compile(this)
   }
   commit(): Effect.Effect<ReadonlyArray<A>, Error.SqlError> {
-    return Effect.useSpan(
-      "sql.execute",
-      (span) =>
-        Effect.withFiberRuntime((fiber) => {
-          const transform = fiber.getFiberRef(currentTransformer)
-          const statement = transform._tag === "Some"
-            ? transform.value(this, make(this.acquirer, this.compiler), fiber.getFiberRefs(), span)
-            : this
-          const [sql, params] = statement.compile()
-          span.attribute("sql.method", "execute")
-          span.attribute("sql.query", sql)
-          return Effect.scoped(Effect.flatMap(this.acquirer, (_) => _.execute(sql, params)))
-        })
-    )
+    return this.withConnection("execute", (connection, sql, params) => connection.execute(sql, params))
   }
   toJSON() {
     const [sql, params] = this.compile()
@@ -247,7 +247,8 @@ const constructorCache = globalValue(
 /** @internal */
 export const make = (
   acquirer: Connection.Connection.Acquirer,
-  compiler: Statement.Compiler
+  compiler: Statement.Compiler,
+  spanAttributes: ReadonlyArray<readonly [string, unknown]> = []
 ): Statement.Constructor => {
   if (constructorCache.has(acquirer)) {
     return constructorCache.get(acquirer)!
@@ -259,7 +260,8 @@ export const make = (
           acquirer,
           compiler,
           strings as TemplateStringsArray,
-          ...args
+          args,
+          spanAttributes
         )
       } else if (typeof strings === "string") {
         return new IdentifierImpl(strings)
@@ -275,7 +277,8 @@ export const make = (
         return new StatementPrimitive<A>(
           [new LiteralImpl(sql, params)],
           acquirer,
-          compiler
+          compiler,
+          spanAttributes
         )
       },
       literal(sql: string) {
@@ -288,7 +291,7 @@ export const make = (
         )
       },
       update(value: any, omit: any) {
-        return new RecordUpdateHelperSingleImpl(value, omit)
+        return new RecordUpdateHelperSingleImpl(value, omit ?? [])
       },
       updateValues(value: any, alias: any) {
         return new RecordUpdateHelperImpl(value, alias)
@@ -310,7 +313,8 @@ export const statement = (
   acquirer: Connection.Connection.Acquirer,
   compiler: Statement.Compiler,
   strings: TemplateStringsArray,
-  ...args: Array<Statement.Argument>
+  args: Array<Statement.Argument>,
+  spanAttributes: ReadonlyArray<readonly [string, unknown]>
 ): Statement.Statement<Connection.Row> => {
   const segments: Array<Statement.Segment> = strings[0].length > 0 ? [new LiteralImpl(strings[0])] : []
 
@@ -332,7 +336,7 @@ export const statement = (
     }
   }
 
-  return new StatementPrimitive<Connection.Row>(segments, acquirer, compiler)
+  return new StatementPrimitive<Connection.Row>(segments, acquirer, compiler, spanAttributes)
 }
 
 /** @internal */
@@ -466,6 +470,7 @@ class CompilerImpl implements Statement.Compiler {
     const binds: Array<Statement.Primitive> = []
     let placeholderCount = 0
     const placeholder = () => this.parameterPlaceholder(++placeholderCount)
+    const placeholderNoIncrement = () => this.parameterPlaceholder(placeholderCount)
 
     for (let i = 0; i < len; i++) {
       const segment = segments[i]
@@ -507,7 +512,7 @@ class CompilerImpl implements Statement.Compiler {
                 segment.value.length
               ),
               segment.value.map((record) =>
-                keys.map((key) => extractPrimitive(record[key], this.onCustom, placeholder))
+                keys.map((key) => extractPrimitive(record[key], this.onCustom, placeholderNoIncrement))
               )
             )
             sql += s
@@ -531,7 +536,7 @@ class CompilerImpl implements Statement.Compiler {
                   extractPrimitive(
                     segment.value[i]?.[keys[j]] ?? null,
                     this.onCustom,
-                    placeholder
+                    placeholderNoIncrement
                   )
                 )
               }
@@ -552,7 +557,7 @@ class CompilerImpl implements Statement.Compiler {
                 extractPrimitive(
                   segment.value[key],
                   this.onCustom,
-                  placeholder
+                  placeholderNoIncrement
                 )
               )
             )
@@ -570,7 +575,7 @@ class CompilerImpl implements Statement.Compiler {
                 extractPrimitive(
                   segment.value[keys[i]],
                   this.onCustom,
-                  placeholder
+                  placeholderNoIncrement
                 )
               )
             }
@@ -588,7 +593,7 @@ class CompilerImpl implements Statement.Compiler {
             segment.alias,
             generateColumns(keys, this.onIdentifier),
             segment.value.map((record) =>
-              keys.map((key) => extractPrimitive(record?.[key], this.onCustom, placeholder))
+              keys.map((key) => extractPrimitive(record?.[key], this.onCustom, placeholderNoIncrement))
             )
           )
           sql += s

@@ -20,6 +20,7 @@ import * as Error from "../../Http/ClientError.js"
 import type * as ClientRequest from "../../Http/ClientRequest.js"
 import type * as ClientResponse from "../../Http/ClientResponse.js"
 import * as Cookies from "../../Http/Cookies.js"
+import * as Headers from "../../Http/Headers.js"
 import * as Method from "../../Http/Method.js"
 import * as TraceContext from "../../Http/TraceContext.js"
 import * as UrlParams from "../../Http/UrlParams.js"
@@ -51,6 +52,23 @@ export const withTracerDisabledWhen = dual<
     predicate: Predicate.Predicate<ClientRequest.ClientRequest>
   ) => Effect.Effect<A, E, R>
 >(2, (self, pred) => Effect.locally(self, currentTracerDisabledWhen, pred))
+
+/** @internal */
+export const currentTracerPropagation = globalValue(
+  Symbol.for("@effect/platform/Http/Client/currentTracerPropagation"),
+  () => FiberRef.unsafeMake(true)
+)
+
+/** @internal */
+export const withTracerPropagation = dual<
+  (
+    enabled: boolean
+  ) => <R, E, A>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>,
+  <R, E, A>(
+    effect: Effect.Effect<A, E, R>,
+    enabled: boolean
+  ) => Effect.Effect<A, E, R>
+>(2, (self, enabled) => Effect.locally(self, currentTracerPropagation, enabled))
 
 /** @internal */
 export const currentFetchOptions = globalValue(
@@ -114,7 +132,8 @@ export const makeDefault = (
           return Effect.fail(new Error.RequestError({ request, reason: "InvalidUrl", error: urlResult.left }))
         }
         const url = urlResult.right
-        const tracerDisabled = fiber.getFiberRef(currentTracerDisabledWhen)(request)
+        const tracerDisabled = !fiber.getFiberRef(FiberRef.currentTracerEnabled) ||
+          fiber.getFiberRef(currentTracerDisabledWhen)(request)
         if (tracerDisabled) {
           return Effect.zipRight(
             addAbort,
@@ -125,7 +144,9 @@ export const makeDefault = (
           addAbort,
           Effect.useSpan(
             `http.client ${request.method}`,
+            { kind: "client" },
             (span) => {
+              span.attribute("http.request.method", request.method)
               span.attribute("server.address", url.origin)
               if (url.port !== "") {
                 span.attribute("server.port", +url.port)
@@ -137,13 +158,18 @@ export const makeDefault = (
               if (query !== "") {
                 span.attribute("url.query", query)
               }
-              Object.entries(request.headers).forEach(([key, value]) => {
-                span.attribute(`http.request.header.${key}`, value)
-              })
+              const redactedHeaderNames = fiber.getFiberRef(Headers.currentRedactedNames)
+              const redactedHeaders = Headers.redact(request.headers, redactedHeaderNames)
+              for (const name in redactedHeaders) {
+                span.attribute(`http.request.header.${name}`, String(redactedHeaders[name]))
+              }
+              request = fiber.getFiberRef(currentTracerPropagation)
+                ? internalRequest.setHeaders(request, TraceContext.toHeaders(span))
+                : request
               return Effect.tap(
                 Effect.withParentSpan(
                   f(
-                    internalRequest.setHeaders(request, TraceContext.toHeaders(span)),
+                    request,
                     url,
                     controller.signal,
                     fiber
@@ -152,9 +178,10 @@ export const makeDefault = (
                 ),
                 (response) => {
                   span.attribute("http.response.status_code", response.status)
-                  Object.entries(response.headers).forEach(([key, value]) => {
-                    span.attribute(`http.response.header.${key}`, value)
-                  })
+                  const redactedHeaders = Headers.redact(response.headers, redactedHeaderNames)
+                  for (const name in redactedHeaders) {
+                    span.attribute(`http.response.header.${name}`, String(redactedHeaders[name]))
+                  }
                 }
               )
             }
@@ -172,7 +199,7 @@ export const fetch: Client.Client.Default = makeDefault((request, url, signal, f
   const context = fiber.getFiberRef(FiberRef.currentContext)
   const fetch: typeof globalThis.fetch = context.unsafeMap.get(Fetch.key) ?? globalThis.fetch
   const options = fiber.getFiberRef(currentFetchOptions)
-  const headers = new Headers(request.headers)
+  const headers = new globalThis.Headers(request.headers)
   const send = (body: BodyInit | undefined) =>
     Effect.map(
       Effect.tryPromise({
@@ -257,16 +284,26 @@ export const filterStatus = dual<
           request,
           response,
           reason: "StatusCode",
-          error: "non 2xx status code"
+          error: "invalid status code"
         })
     )))
 
 /** @internal */
-export const filterStatusOk: <E, R>(
+export const filterStatusOk = <E, R>(
   self: Client.Client.WithResponse<E, R>
-) => Client.Client.WithResponse<E | Error.ResponseError, R> = filterStatus(
-  (status) => status >= 200 && status < 300
-)
+): Client.Client.WithResponse<E | Error.ResponseError, R> =>
+  transform(self, (effect, request) =>
+    Effect.filterOrFail(
+      effect,
+      (response) => response.status >= 200 && response.status < 300,
+      (response) =>
+        new Error.ResponseError({
+          request,
+          response,
+          reason: "StatusCode",
+          error: "non 2xx status code"
+        })
+    ))
 
 /** @internal */
 export const fetchOk: Client.Client.Default = filterStatusOk(fetch)

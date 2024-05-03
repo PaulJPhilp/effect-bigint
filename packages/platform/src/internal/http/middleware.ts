@@ -6,10 +6,12 @@ import { globalValue } from "effect/GlobalValue"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import type * as Predicate from "effect/Predicate"
+import type * as App from "../../Http/App.js"
 import * as Headers from "../../Http/Headers.js"
 import type * as Middleware from "../../Http/Middleware.js"
 import * as ServerError from "../../Http/ServerError.js"
 import * as ServerRequest from "../../Http/ServerRequest.js"
+import type { ServerResponse } from "../../Http/ServerResponse.js"
 import * as TraceContext from "../../Http/TraceContext.js"
 
 /** @internal */
@@ -112,12 +114,18 @@ export const tracer = make((httpApp) =>
     let url: URL | undefined = undefined
     try {
       url = new URL(request.url, `${protocol}://${host}`)
+      if (url.username !== "" || url.password !== "") {
+        url.username = "REDACTED"
+        url.password = "REDACTED"
+      }
     } catch (_) {
       //
     }
+    const redactedHeaderNames = fiber.getFiberRef(Headers.currentRedactedNames)
+    const redactedHeaders = Headers.redact(request.headers, redactedHeaderNames)
     return Effect.useSpan(
       `http.server ${request.method}`,
-      { parent: Option.getOrUndefined(TraceContext.fromHeaders(request.headers)) },
+      { parent: Option.getOrUndefined(TraceContext.fromHeaders(request.headers)), kind: "server" },
       (span) => {
         span.attribute("http.request.method", request.method)
         if (url !== undefined) {
@@ -132,9 +140,9 @@ export const tracer = make((httpApp) =>
         if (request.headers["user-agent"] !== undefined) {
           span.attribute("user_agent.original", request.headers["user-agent"])
         }
-        Object.entries(request.headers).forEach(([key, value]) => {
-          span.attribute(`http.request.header.${key}`, value)
-        })
+        for (const name in redactedHeaders) {
+          span.attribute(`http.request.header.${name}`, String(redactedHeaders[name]))
+        }
         if (request.remoteAddress._tag === "Some") {
           span.attribute("client.address", request.remoteAddress.value)
         }
@@ -146,9 +154,10 @@ export const tracer = make((httpApp) =>
             } else {
               const response = exit.value
               span.attribute("http.response.status_code", response.status)
-              Object.entries(response.headers).forEach(([key, value]) => {
-                span.attribute(`http.response.header.${key}`, value)
-              })
+              const redactedHeaders = Headers.redact(response.headers, redactedHeaderNames)
+              for (const name in redactedHeaders) {
+                span.attribute(`http.response.header.${name}`, String(redactedHeaders[name]))
+              }
             }
             return exit
           }
@@ -172,3 +181,20 @@ export const xForwardedHeaders = make((httpApp) =>
       })
       : request)
 )
+
+/** @internal */
+export const searchParamsParser = <E, R>(httpApp: App.Default<E, R>) =>
+  Effect.withFiberRuntime<
+    ServerResponse,
+    E,
+    ServerRequest.ServerRequest | Exclude<R, ServerRequest.ParsedSearchParams>
+  >((fiber) => {
+    const context = fiber.getFiberRef(FiberRef.currentContext)
+    const request = Context.unsafeGet(context, ServerRequest.ServerRequest)
+    const params = ServerRequest.searchParamsFromURL(new URL(request.url))
+    return Effect.locally(
+      httpApp,
+      FiberRef.currentContext,
+      Context.add(context, ServerRequest.ParsedSearchParams, params)
+    ) as any
+  })

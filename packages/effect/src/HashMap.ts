@@ -9,6 +9,7 @@ import * as HM from "./internal/hashMap.js"
 import * as _keySet from "./internal/hashMap/keySet.js"
 import type { Option } from "./Option.js"
 import type { Pipeable } from "./Pipeable.js"
+import type { NoInfer } from "./Types.js"
 
 const TypeId: unique symbol = HM.HashMapTypeId as TypeId
 
@@ -39,7 +40,7 @@ export declare namespace HashMap {
    * This type-level utility extracts the key type `K` from a `HashMap<K, V>` type.
    *
    * @example
-   * import * as HashMap from "effect/HashMap"
+   * import { HashMap } from "effect"
    *
    * declare const hm: HashMap.HashMap<string, number>
    *
@@ -54,7 +55,7 @@ export declare namespace HashMap {
    * This type-level utility extracts the value type `V` from a `HashMap<K, V>` type.
    *
    * @example
-   * import * as HashMap from "effect/HashMap"
+   * import { HashMap } from "effect"
    *
    * declare const hm: HashMap.HashMap<string, number>
    *

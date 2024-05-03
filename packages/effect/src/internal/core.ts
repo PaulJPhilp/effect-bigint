@@ -35,7 +35,8 @@ import type * as RuntimeFlags from "../RuntimeFlags.js"
 import * as RuntimeFlagsPatch from "../RuntimeFlagsPatch.js"
 import type * as Scope from "../Scope.js"
 import type * as Tracer from "../Tracer.js"
-import type { NotFunction } from "../Types.js"
+import type { NoInfer, NotFunction } from "../Types.js"
+import { YieldWrap } from "../Utils.js"
 import * as _blockedRequests from "./blockedRequests.js"
 import * as internalCause from "./cause.js"
 import * as deferred from "./deferred.js"
@@ -47,6 +48,7 @@ import type * as fiberScope from "./fiberScope.js"
 import * as DeferredOpCodes from "./opCodes/deferred.js"
 import * as OpCodes from "./opCodes/effect.js"
 import * as _runtimeFlags from "./runtimeFlags.js"
+import { SingleShotGen } from "./singleShotGen.js"
 import * as internalTracer from "./tracer.js"
 
 // -----------------------------------------------------------------------------
@@ -178,6 +180,9 @@ class EffectPrimitive {
   [NodeInspectSymbol]() {
     return this.toJSON()
   }
+  [Symbol.iterator]() {
+    return new SingleShotGen(new YieldWrap(this))
+  }
 }
 
 /** @internal */
@@ -192,10 +197,18 @@ class EffectPrimitiveFailure {
     this._tag = _op
   }
   [Equal.symbol](this: {}, that: unknown) {
-    return this === that
+    return exitIsExit(that) && that._op === "Failure" &&
+      // @ts-expect-error
+      Equal.equals(this.effect_instruction_i0, that.effect_instruction_i0)
   }
   [Hash.symbol](this: {}) {
-    return Hash.cached(this, Hash.random(this))
+    return pipe(
+      // @ts-expect-error
+      Hash.string(this._tag),
+      // @ts-expect-error
+      Hash.combine(Hash.hash(this.effect_instruction_i0)),
+      Hash.cached(this)
+    )
   }
   get cause() {
     return this.effect_instruction_i0
@@ -216,6 +229,9 @@ class EffectPrimitiveFailure {
   [NodeInspectSymbol]() {
     return this.toJSON()
   }
+  [Symbol.iterator]() {
+    return new SingleShotGen(new YieldWrap(this))
+  }
 }
 
 /** @internal */
@@ -230,10 +246,18 @@ class EffectPrimitiveSuccess {
     this._tag = _op
   }
   [Equal.symbol](this: {}, that: unknown) {
-    return this === that
+    return exitIsExit(that) && that._op === "Success" &&
+      // @ts-expect-error
+      Equal.equals(this.effect_instruction_i0, that.effect_instruction_i0)
   }
   [Hash.symbol](this: {}) {
-    return Hash.cached(this, Hash.random(this))
+    return pipe(
+      // @ts-expect-error
+      Hash.string(this._tag),
+      // @ts-expect-error
+      Hash.combine(Hash.hash(this.effect_instruction_i0)),
+      Hash.cached(this)
+    )
   }
   get value() {
     return this.effect_instruction_i0
@@ -253,6 +277,9 @@ class EffectPrimitiveSuccess {
   }
   [NodeInspectSymbol]() {
     return this.toJSON()
+  }
+  [Symbol.iterator]() {
+    return new SingleShotGen(new YieldWrap(this))
   }
 }
 
@@ -2971,6 +2998,7 @@ const NoopSpanProto: Tracer.Span = {
   },
   attributes: new Map(),
   links: [],
+  kind: "internal",
   attribute() {},
   event() {},
   end() {}

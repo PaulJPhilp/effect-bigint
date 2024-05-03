@@ -13,6 +13,7 @@ import { pipeArguments } from "../Pipeable.js"
 import { hasProperty, isFunction } from "../Predicate.js"
 import type { Predicate, Refinement } from "../Predicate.js"
 import type { AnySpan, Span } from "../Tracer.js"
+import type { NoInfer } from "../Types.js"
 import { getBugErrorMessage } from "./errors.js"
 import * as OpCodes from "./opCodes/cause.js"
 
@@ -685,7 +686,7 @@ const evaluateCause = (
         break
       }
       case OpCodes.OP_FAIL: {
-        _parallel = HashSet.add(_parallel, cause.error)
+        _parallel = HashSet.add(_parallel, Chunk.make(cause._tag, cause.error))
         if (stack.length === 0) {
           return [_parallel, _sequential]
         }
@@ -693,7 +694,7 @@ const evaluateCause = (
         break
       }
       case OpCodes.OP_DIE: {
-        _parallel = HashSet.add(_parallel, cause.defect)
+        _parallel = HashSet.add(_parallel, Chunk.make(cause._tag, cause.defect))
         if (stack.length === 0) {
           return [_parallel, _sequential]
         }
@@ -701,7 +702,7 @@ const evaluateCause = (
         break
       }
       case OpCodes.OP_INTERRUPT: {
-        _parallel = HashSet.add(_parallel, cause.fiberId as unknown)
+        _parallel = HashSet.add(_parallel, Chunk.make(cause._tag, cause.fiberId as unknown))
         if (stack.length === 0) {
           return [_parallel, _sequential]
         }

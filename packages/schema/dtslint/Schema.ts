@@ -1,3 +1,4 @@
+import type * as AST from "@effect/schema/AST"
 import * as ParseResult from "@effect/schema/ParseResult"
 import * as S from "@effect/schema/Schema"
 import * as Brand from "effect/Brand"
@@ -1164,7 +1165,7 @@ const FooterLocaleIDs = S.Literal("footer_title", "footer_sendoff")
 S.TemplateLiteral(S.Union(EmailLocaleIDs, FooterLocaleIDs), S.Literal("_id"))
 
 // ---------------------------------------------
-// AttachPropertySignature
+// attachPropertySignature
 // ---------------------------------------------
 
 // $ExpectType Schema<{ readonly radius: number; readonly kind: "circle"; }, { readonly radius: number; }, never>
@@ -1172,6 +1173,14 @@ pipe(S.Struct({ radius: S.Number }), S.attachPropertySignature("kind", "circle")
 
 // $ExpectType Schema<{ readonly radius: number; readonly kind: "circle"; }, { readonly radius: string; }, never>
 pipe(S.Struct({ radius: S.NumberFromString }), S.attachPropertySignature("kind", "circle"))
+
+const taggedStruct = <Name extends AST.LiteralValue | symbol, Fields extends S.Struct.Fields>(
+  name: Name,
+  fields: Fields
+) => S.Struct(fields).pipe(S.attachPropertySignature("_tag", name))
+
+// $ExpectType Schema<{ readonly a: string; readonly _tag: "A"; }, { readonly a: string; }, never>
+taggedStruct("A", { a: S.String })
 
 // ---------------------------------------------
 // filter
@@ -1255,8 +1264,8 @@ S.split(",").pipe(S.compose(S.Array(S.NumberFromString)))
 // $ExpectType Schema<readonly number[], string, never>
 S.compose(S.split(","), S.Array(S.NumberFromString), { strict: true })
 
-// // $ExpectType Schema<readonly number[], string, never>
-// S.split(",").pipe(S.compose(S.Array(S.NumberFromString), { strict: true }))
+// $ExpectType Schema<readonly number[], string, never>
+S.split(",").pipe(S.compose(S.Array(S.NumberFromString), { strict: true }))
 
 // @ts-expect-error
 S.compose(S.String, S.Number)
@@ -1272,8 +1281,8 @@ S.compose(S.Union(S.Null, S.String), S.NumberFromString)
 // $ExpectType Schema<number, string | null, never>
 S.compose(S.Union(S.Null, S.String), S.NumberFromString, { strict: false })
 
-// // $ExpectType Schema<number, string | null, never>
-// S.Union(S.Null, S.String).pipe(S.compose(S.NumberFromString))
+// $ExpectType Schema<number, string | null, never>
+S.Union(S.Null, S.String).pipe(S.compose(S.NumberFromString))
 
 // $ExpectType Schema<number, string | null, never>
 S.Union(S.Null, S.String).pipe(S.compose(S.NumberFromString, { strict: false }))
@@ -1286,8 +1295,8 @@ S.compose(S.NumberFromString, S.Union(S.Null, S.Number))
 // $ExpectType Schema<number | null, string, never>
 S.compose(S.NumberFromString, S.Union(S.Null, S.Number), { strict: false })
 
-// // $ExpectType Schema<number | null, string, never>
-// S.NumberFromString.pipe(S.compose(S.Union(S.Null, S.Number)))
+// $ExpectType Schema<number | null, string, never>
+S.NumberFromString.pipe(S.compose(S.Union(S.Null, S.Number)))
 
 // $ExpectType Schema<number | null, string, never>
 S.NumberFromString.pipe(S.compose(S.Union(S.Null, S.Number), { strict: false }))

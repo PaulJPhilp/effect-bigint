@@ -56,7 +56,7 @@ export {
  * @since 1.0.0
  * @category type ids
  */
-export const TypeId = Symbol.for("@effect/experimental/Machine")
+export const TypeId: unique symbol = Symbol.for("@effect/experimental/Machine")
 
 /**
  * @since 1.0.0
@@ -85,7 +85,7 @@ export interface Machine<
  * @since 1.0.0
  * @category type ids
  */
-export const SerializableTypeId = Symbol.for("@effect/experimental/Machine/Serializable")
+export const SerializableTypeId: unique symbol = Symbol.for("@effect/experimental/Machine/Serializable")
 
 /**
  * @since 1.0.0
@@ -124,7 +124,7 @@ export interface SerializableMachine<
  * @since 1.0.0
  * @category type ids
  */
-export const ActorTypeId = Symbol.for("@effect/experimental/Machine/Actor")
+export const ActorTypeId: unique symbol = Symbol.for("@effect/experimental/Machine/Actor")
 
 /**
  * @since 1.0.0
@@ -541,7 +541,8 @@ export const boot = <
             attributes: {
               "effect.machine": runState.identifier,
               ...request
-            }
+            },
+            kind: "client"
           }, (span) =>
             Queue.offer(requests, [request, deferred, span, true]).pipe(
               Effect.zipRight(Deferred.await(deferred)),
@@ -563,7 +564,8 @@ export const boot = <
             attributes: {
               "effect.machine": runState.identifier,
               ...request
-            }
+            },
+            kind: "client"
           }, (span) => Queue.offer(requests, [request, deferred, span, true]))
         }
       )
@@ -756,6 +758,7 @@ export const boot = <
             )
             if (addSpan) {
               handler = Effect.withSpan(handler, `Machine.process ${request._tag}`, {
+                kind: "server",
                 parent: span,
                 attributes: {
                   "effect.machine": runState.identifier

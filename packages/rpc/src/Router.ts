@@ -22,7 +22,7 @@ import * as Rpc from "./Rpc.js"
  * @since 1.0.0
  * @category type ids
  */
-export const TypeId = Symbol.for("@effect/rpc/Router")
+export const TypeId: unique symbol = Symbol.for("@effect/rpc/Router")
 
 /**
  * @since 1.0.0
@@ -237,6 +237,7 @@ export const toHandler = <R extends Router<any, any>>(router: R, options?: {
                 }),
                 Effect.locally(Rpc.currentHeaders, req.headers as any),
                 Effect.withSpan(`${spanPrefix}${request._tag}`, {
+                  kind: "server",
                   parent: {
                     _tag: "ExternalSpan",
                     traceId: req.traceId,
@@ -268,6 +269,7 @@ export const toHandler = <R extends Router<any, any>>(router: R, options?: {
               }),
               Effect.locally(Rpc.currentHeaders, req.headers as any),
               Effect.withSpan(`${spanPrefix}${request._tag}`, {
+                kind: "server",
                 parent: {
                   _tag: "ExternalSpan",
                   traceId: req.traceId,
@@ -323,6 +325,7 @@ export const toHandlerEffect = <R extends Router<any, any>>(router: R, options?:
             Effect.orDie,
             Effect.locally(Rpc.currentHeaders, req.headers as any),
             Effect.withSpan(`${spanPrefix}${request._tag}`, {
+              kind: "server",
               parent: {
                 _tag: "ExternalSpan",
                 traceId: req.traceId,
@@ -342,6 +345,7 @@ export const toHandlerEffect = <R extends Router<any, any>>(router: R, options?:
           Effect.flatMap(encode),
           Effect.locally(Rpc.currentHeaders, req.headers as any),
           Effect.withSpan(`${spanPrefix}${request._tag}`, {
+            kind: "server",
             parent: {
               _tag: "ExternalSpan",
               traceId: req.traceId,

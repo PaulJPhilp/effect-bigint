@@ -41,7 +41,7 @@ import { currentScheduler, type Scheduler } from "../Scheduler.js"
 import type * as Scope from "../Scope.js"
 import type * as Supervisor from "../Supervisor.js"
 import type * as Tracer from "../Tracer.js"
-import type { Concurrency } from "../Types.js"
+import type { Concurrency, NoInfer } from "../Types.js"
 import * as _RequestBlock from "./blockedRequests.js"
 import * as internalCause from "./cause.js"
 import * as clock from "./clock.js"
@@ -1502,6 +1502,29 @@ export const batchedLogger = dual<
     )
   }))
 
+export const annotateLogsScoped: {
+  (key: string, value: unknown): Effect.Effect<void, never, Scope.Scope>
+  (values: Record<string, unknown>): Effect.Effect<void, never, Scope.Scope>
+} = function() {
+  if (typeof arguments[0] === "string") {
+    return fiberRefLocallyScopedWith(
+      core.currentLogAnnotations,
+      HashMap.set(arguments[0], arguments[1])
+    )
+  }
+  const entries = Object.entries(arguments[0])
+  return fiberRefLocallyScopedWith(
+    core.currentLogAnnotations,
+    HashMap.mutate((annotations) => {
+      for (let i = 0; i < entries.length; i++) {
+        const [key, value] = entries[i]
+        HashMap.set(annotations, key, value)
+      }
+      return annotations
+    })
+  )
+}
+
 // circular with Effect
 
 /* @internal */
@@ -1585,7 +1608,7 @@ export const exists: {
     readonly batching?: boolean | "inherit" | undefined
   }): Effect.Effect<boolean, E, R>
 } = dual(
-  (args) => Predicate.isIterable(args[0]),
+  (args) => Predicate.isIterable(args[0]) && !core.isEffect(args[0]),
   <A, E, R>(elements: Iterable<A>, f: (a: A, i: number) => Effect.Effect<boolean, E, R>, options?: {
     readonly concurrency?: Concurrency | undefined
     readonly batching?: boolean | "inherit" | undefined
@@ -1639,7 +1662,7 @@ export const filter = dual<
     readonly negate?: boolean | undefined
   }) => Effect.Effect<Array<A>, E, R>
 >(
-  (args) => Predicate.isIterable(args[0]),
+  (args) => Predicate.isIterable(args[0]) && !core.isEffect(args[0]),
   <A, E, R>(elements: Iterable<A>, f: (a: NoInfer<A>, i: number) => Effect.Effect<boolean, E, R>, options?: {
     readonly concurrency?: Concurrency | undefined
     readonly batching?: boolean | "inherit" | undefined
@@ -1883,14 +1906,16 @@ export const replicateEffect: {
 
 /* @internal */
 export const forEach: {
-  <A, B, E, R>(
-    f: (a: A, i: number) => Effect.Effect<B, E, R>,
+  <B, E, R, S extends Iterable<any>>(
+    f: (a: RA.ReadonlyArray.Infer<S>, i: number) => Effect.Effect<B, E, R>,
     options?: {
       readonly concurrency?: Concurrency | undefined
       readonly batching?: boolean | "inherit" | undefined
       readonly discard?: false | undefined
-    }
-  ): (self: Iterable<A>) => Effect.Effect<Array<B>, E, R>
+    } | undefined
+  ): (
+    self: S
+  ) => Effect.Effect<RA.ReadonlyArray.With<S, B>, E, R>
   <A, B, E, R>(
     f: (a: A, i: number) => Effect.Effect<B, E, R>,
     options: {
@@ -1900,13 +1925,22 @@ export const forEach: {
     }
   ): (self: Iterable<A>) => Effect.Effect<void, E, R>
   <A, B, E, R>(
+    self: RA.NonEmptyReadonlyArray<A>,
+    f: (a: A, i: number) => Effect.Effect<B, E, R>,
+    options?: {
+      readonly concurrency?: Concurrency | undefined
+      readonly batching?: boolean | "inherit" | undefined
+      readonly discard?: false | undefined
+    } | undefined
+  ): Effect.Effect<RA.NonEmptyArray<B>, E, R>
+  <A, B, E, R>(
     self: Iterable<A>,
     f: (a: A, i: number) => Effect.Effect<B, E, R>,
     options?: {
       readonly concurrency?: Concurrency | undefined
       readonly batching?: boolean | "inherit" | undefined
       readonly discard?: false | undefined
-    }
+    } | undefined
   ): Effect.Effect<Array<B>, E, R>
   <A, B, E, R>(
     self: Iterable<A>,
@@ -2551,7 +2585,7 @@ export const reduceEffect = dual<
       readonly batching?: boolean | "inherit" | undefined
     }
   ) => Effect.Effect<Z, E | Effect.Effect.Error<Eff>, R | Effect.Effect.Context<Eff>>
->((args) => Predicate.isIterable(args[0]), <A, E, R, Z>(
+>((args) => Predicate.isIterable(args[0]) && !core.isEffect(args[0]), <A, E, R, Z>(
   elements: Iterable<Effect.Effect<A, E, R>>,
   zero: Effect.Effect<Z, E, R>,
   f: (acc: NoInfer<Z>, a: NoInfer<A>, i: number) => Z,
@@ -3507,9 +3541,26 @@ export const invokeWithInterrupt: <A, E, R>(
             const counts = entries.map((_) => _.listeners.count)
             const checkDone = () => {
               if (counts.every((count) => count === 0)) {
-                cleanup.forEach((f) => f())
-                onInterrupt?.()
-                cb(core.interruptFiber(processing))
+                if (
+                  entries.every((_) => {
+                    if (_.result.state.current._tag === "Pending") {
+                      return true
+                    } else if (
+                      _.result.state.current._tag === "Done" &&
+                      core.exitIsExit(_.result.state.current.effect) &&
+                      _.result.state.current.effect._tag === "Failure" &&
+                      internalCause.isInterrupted(_.result.state.current.effect.cause)
+                    ) {
+                      return true
+                    } else {
+                      return false
+                    }
+                  })
+                ) {
+                  cleanup.forEach((f) => f())
+                  onInterrupt?.()
+                  cb(core.interruptFiber(processing))
+                }
               }
             }
             processing.addObserver((exit) => {
@@ -3570,13 +3621,7 @@ export const interruptWhenPossible = dual<
 /** @internal */
 export const makeSpanScoped = (
   name: string,
-  options?: {
-    readonly attributes?: Record<string, unknown> | undefined
-    readonly links?: ReadonlyArray<Tracer.SpanLink> | undefined
-    readonly parent?: Tracer.AnySpan | undefined
-    readonly root?: boolean | undefined
-    readonly context?: Context.Context<never> | undefined
-  } | undefined
+  options?: Tracer.SpanOptions | undefined
 ): Effect.Effect<Tracer.Span, never, Scope.Scope> =>
   core.uninterruptible(
     core.withFiberRuntime((fiber) => {
@@ -3603,20 +3648,15 @@ export const withTracerScoped = (value: Tracer.Tracer): Effect.Effect<void, neve
 
 /** @internal */
 export const withSpanScoped = dual<
-  (name: string, options?: {
-    readonly attributes?: Record<string, unknown> | undefined
-    readonly links?: ReadonlyArray<Tracer.SpanLink> | undefined
-    readonly parent?: Tracer.AnySpan | undefined
-    readonly root?: boolean | undefined
-    readonly context?: Context.Context<never> | undefined
-  }) => <A, E, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A, E, Exclude<R, Tracer.ParentSpan> | Scope.Scope>,
-  <A, E, R>(self: Effect.Effect<A, E, R>, name: string, options?: {
-    readonly attributes?: Record<string, unknown> | undefined
-    readonly links?: ReadonlyArray<Tracer.SpanLink> | undefined
-    readonly parent?: Tracer.AnySpan | undefined
-    readonly root?: boolean | undefined
-    readonly context?: Context.Context<never> | undefined
-  }) => Effect.Effect<A, E, Exclude<R, Tracer.ParentSpan> | Scope.Scope>
+  (
+    name: string,
+    options?: Tracer.SpanOptions
+  ) => <A, E, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A, E, Exclude<R, Tracer.ParentSpan> | Scope.Scope>,
+  <A, E, R>(
+    self: Effect.Effect<A, E, R>,
+    name: string,
+    options?: Tracer.SpanOptions
+  ) => Effect.Effect<A, E, Exclude<R, Tracer.ParentSpan> | Scope.Scope>
 >(
   (args) => typeof args[0] !== "string",
   (self, name, options) =>

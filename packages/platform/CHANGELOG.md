@@ -1,5 +1,126 @@
 # @effect/platform
 
+## 0.52.2
+
+### Patch Changes
+
+- [#2679](https://github.com/Effect-TS/effect/pull/2679) [`2e1cdf6`](https://github.com/Effect-TS/effect/commit/2e1cdf67d141281288fffe9a5c10d1379a800513) Thanks [@tim-smart](https://github.com/tim-smart)! - ensure all type ids are annotated with `unique symbol`
+
+- Updated dependencies [[`2e1cdf6`](https://github.com/Effect-TS/effect/commit/2e1cdf67d141281288fffe9a5c10d1379a800513)]:
+  - effect@3.1.2
+  - @effect/schema@0.66.14
+
+## 0.52.1
+
+### Patch Changes
+
+- Updated dependencies [[`e5e56d1`](https://github.com/Effect-TS/effect/commit/e5e56d138dbed3204636f605229c6685f89659fc)]:
+  - effect@3.1.1
+  - @effect/schema@0.66.13
+
+## 0.52.0
+
+### Minor Changes
+
+- [#2669](https://github.com/Effect-TS/effect/pull/2669) [`9deab0a`](https://github.com/Effect-TS/effect/commit/9deab0aec9e99501f9441843e34df9afa10c5be9) Thanks [@tim-smart](https://github.com/tim-smart)! - move http search params apis to ServerRequest module
+
+  If you want to access the search params for a request, you can now use the `Http.request.ParsedSearchParams` tag.
+
+  ```ts
+  import * as Http from "@effect/platform/HttpServer";
+  import { Effect } from "effect";
+
+  Effect.gen(function* () {
+    const searchParams = yield* Http.request.ParsedSearchParams;
+    console.log(searchParams);
+  });
+  ```
+
+  The schema method has also been moved to the `ServerRequest` module. It is now available as `Http.request.schemaSearchParams`.
+
+### Patch Changes
+
+- [#2672](https://github.com/Effect-TS/effect/pull/2672) [`7719b8a`](https://github.com/Effect-TS/effect/commit/7719b8a7350c14e952ffe685bfd5308773b3e271) Thanks [@tim-smart](https://github.com/tim-smart)! - allow http client trace propagation to be controlled
+
+  To disable trace propagation:
+
+  ```ts
+  import { HttpClient as Http } from "@effect/platform";
+
+  Http.request
+    .get("https://example.com")
+    .pipe(Http.client.fetchOk, Http.client.withTracerPropagation(false));
+  ```
+
+## 0.51.0
+
+### Minor Changes
+
+- [#2543](https://github.com/Effect-TS/effect/pull/2543) [`0ec93cb`](https://github.com/Effect-TS/effect/commit/0ec93cb4f166e7401c171c2f8e8276ce958d9a57) Thanks [@github-actions](https://github.com/apps/github-actions)! - \* capitalised Http.multipart.FileSchema and Http.multipart.FilesSchema
+  - exported Http.multipart.FileSchema
+  - added Http.multipart.SingleFileSchema
+
+### Patch Changes
+
+- [#2543](https://github.com/Effect-TS/effect/pull/2543) [`a023f28`](https://github.com/Effect-TS/effect/commit/a023f28336f3865687d9a30c1883e36909906d85) Thanks [@github-actions](https://github.com/apps/github-actions)! - set span `kind` where applicable
+
+- Updated dependencies [[`c3c12c6`](https://github.com/Effect-TS/effect/commit/c3c12c6625633fe80e79f9db75a3b8cf8ca8b11d), [`ba64ea6`](https://github.com/Effect-TS/effect/commit/ba64ea6757810c5e74cad3863a7d19d4d38af66b), [`b5de2d2`](https://github.com/Effect-TS/effect/commit/b5de2d2ce5b1afe8be90827bf898a95cec40eb2b), [`a1c7ab8`](https://github.com/Effect-TS/effect/commit/a1c7ab8ffedacd18c1fc784f4ff5844f79498b83), [`a023f28`](https://github.com/Effect-TS/effect/commit/a023f28336f3865687d9a30c1883e36909906d85), [`1c9454d`](https://github.com/Effect-TS/effect/commit/1c9454d532eae79b9f759aea77f59332cc6d18ed), [`92d56db`](https://github.com/Effect-TS/effect/commit/92d56dbb3f33e36636c2a2f1030c56492e39cf4d)]:
+  - effect@3.1.0
+  - @effect/schema@0.66.12
+
+## 0.50.8
+
+### Patch Changes
+
+- [#2650](https://github.com/Effect-TS/effect/pull/2650) [`16039a0`](https://github.com/Effect-TS/effect/commit/16039a08f04f11545e2fdf40952788a8f9cef04f) Thanks [@tim-smart](https://github.com/tim-smart)! - improve error messages for Http.client.filterStatus\*
+
+- [#2648](https://github.com/Effect-TS/effect/pull/2648) [`d1d33e1`](https://github.com/Effect-TS/effect/commit/d1d33e10b25109f44b5ab1c6e4d778a59c0d3eeb) Thanks [@floydspace](https://github.com/floydspace)! - Fixed import path for type import.
+
+- Updated dependencies [[`557707b`](https://github.com/Effect-TS/effect/commit/557707bc9e5f230c8964d2757012075c34339b5c), [`f4ed306`](https://github.com/Effect-TS/effect/commit/f4ed3068a70b50302d078a30d18ca3cfd2bc679c), [`661004f`](https://github.com/Effect-TS/effect/commit/661004f4bf5f8b25f5a0678c21a3a822188ce461), [`e79cb83`](https://github.com/Effect-TS/effect/commit/e79cb83d3b19098bc40a3012e2a059b8426306c2)]:
+  - effect@3.0.8
+  - @effect/schema@0.66.11
+
+## 0.50.7
+
+### Patch Changes
+
+- Updated dependencies [[`18de56b`](https://github.com/Effect-TS/effect/commit/18de56b4a6b6d1f99230dfabf9147d59ea4dd759)]:
+  - effect@3.0.7
+  - @effect/schema@0.66.10
+
+## 0.50.6
+
+### Patch Changes
+
+- Updated dependencies [[`ffe4f4e`](https://github.com/Effect-TS/effect/commit/ffe4f4e95db35fff6869e360b072e3837befa0a1), [`027418e`](https://github.com/Effect-TS/effect/commit/027418edaa6aa6c0ae4861b95832827b45adace4), [`ac1898e`](https://github.com/Effect-TS/effect/commit/ac1898eb7bc96880f911c276048e2ea3d6fe9c50), [`ffe4f4e`](https://github.com/Effect-TS/effect/commit/ffe4f4e95db35fff6869e360b072e3837befa0a1), [`8206529`](https://github.com/Effect-TS/effect/commit/8206529d6a7bbf3e3c6f670afb0381e83176736e)]:
+  - effect@3.0.6
+  - @effect/schema@0.66.9
+
+## 0.50.5
+
+### Patch Changes
+
+- Updated dependencies [[`6222404`](https://github.com/Effect-TS/effect/commit/62224044678751829ed2f128e05133a91c6b0569), [`868ed2a`](https://github.com/Effect-TS/effect/commit/868ed2a8fe94ee7f4206a6070f29dcf2a5ba1dc3)]:
+  - effect@3.0.5
+  - @effect/schema@0.66.8
+
+## 0.50.4
+
+### Patch Changes
+
+- Updated dependencies [[`dd41c6c`](https://github.com/Effect-TS/effect/commit/dd41c6c725b1c1c980683275d8fa69779902187e), [`9a24667`](https://github.com/Effect-TS/effect/commit/9a246672008a2b668d43fbfd2fe5508c54b2b920)]:
+  - @effect/schema@0.66.7
+  - effect@3.0.4
+
+## 0.50.3
+
+### Patch Changes
+
+- [#2589](https://github.com/Effect-TS/effect/pull/2589) [`b3b51a2`](https://github.com/Effect-TS/effect/commit/b3b51a2ea0c6ab92a363db46ebaa7e1176d089f5) Thanks [@tim-smart](https://github.com/tim-smart)! - redact some common sensitive http headers names in traces
+
+- Updated dependencies [[`9dfc156`](https://github.com/Effect-TS/effect/commit/9dfc156dc13fb4da9c777aae3acece4b5ecf0064), [`80271bd`](https://github.com/Effect-TS/effect/commit/80271bdc648e9efa659ce66b2c255754a6a1a8b0), [`e4ba97d`](https://github.com/Effect-TS/effect/commit/e4ba97d060c16bdf4e3b5bd5db6777f121a6768c)]:
+  - @effect/schema@0.66.6
+
 ## 0.50.2
 
 ### Patch Changes

@@ -39,6 +39,7 @@ import * as arbitrary_ from "./Arbitrary.js"
 import type { ParseOptions } from "./AST.js"
 import * as AST from "./AST.js"
 import * as equivalence_ from "./Equivalence.js"
+import type * as fastCheck_ from "./FastCheck.js"
 import * as errors_ from "./internal/errors.js"
 import * as filters_ from "./internal/filters.js"
 import * as serializable_ from "./internal/serializable.js"
@@ -794,7 +795,7 @@ export const declare: {
  * @category type id
  * @since 1.0.0
  */
-export const BrandTypeId = Symbol.for("@effect/schema/TypeId/Brand")
+export const BrandTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/Brand")
 
 /**
  * @category constructors
@@ -822,7 +823,7 @@ export const fromBrand = <C extends brand_.Brand<string | symbol>>(
  * @category type id
  * @since 1.0.0
  */
-export const InstanceOfTypeId = Symbol.for("@effect/schema/TypeId/InstanceOf")
+export const InstanceOfTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/InstanceOf")
 
 /**
  * @category api interface
@@ -2262,26 +2263,29 @@ export const pluck: {
 
 const makeBrandSchema = <S extends Schema.AnyNoContext, B extends string | symbol>(
   self: AST.AST,
-  annotations: Annotations.Schema<Schema.Type<S> & brand_.Brand<B>>,
-  brand: string | symbol
+  annotations: Annotations.Schema<Schema.Type<S> & brand_.Brand<B>>
 ): brand<S, B> => {
   const ast = AST.annotations(self, toASTAnnotations(annotations))
-  const validateEither_ = validateEither(make(ast))
+  const schema = make(ast)
+  const validateEither_ = validateEither(schema)
 
-  const refined: any = brand_.refined((unbranded) =>
+  //     v-- function
+  const out: any = brand_.refined((unbranded) =>
     either_.match(validateEither_(unbranded), {
       onLeft: (e) => option_.some(brand_.error(TreeFormatter.formatErrorSync(e), e)),
       onRight: () => option_.none()
     })
   )
-  // make refined a BrandSchema...
-  refined.ast = ast
-  refined[TypeId] = variance
-  Object.setPrototypeOf(refined, SchemaImpl.prototype)
-  refined.annotations = (annotations: Annotations.Schema<Schema.Type<S> & brand_.Brand<B>>) => {
-    return makeBrandSchema(ast, annotations, brand)
-  }
-  return refined
+  // ----------------
+  // Schema interface
+  // ----------------
+  Object.setPrototypeOf(
+    Object.assign(out, schema, {
+      annotations: (a: typeof annotations) => makeBrandSchema(ast, a)
+    }),
+    Object.getPrototypeOf(schema)
+  )
+  return out
 }
 
 /**
@@ -2341,7 +2345,7 @@ export const brand = <S extends Schema.AnyNoContext, B extends string | symbol>(
     title: String(self.ast) + ` & Brand<${util_.formatUnknown(brand)}>`,
     ...annotations,
     [AST.BrandAnnotationId]: brandAnnotation
-  }, brand)
+  })
 }
 
 /**
@@ -2528,18 +2532,21 @@ export const extend: {
  * @since 1.0.0
  */
 export const compose: {
+  <D, C extends B, R2, B>(
+    to: Schema<D, C, R2>
+  ): <A, R1>(from: Schema<B, A, R1>) => Schema<D, A, R1 | R2>
+  <D, C, R2>(
+    to: Schema<D, C, R2>
+  ): <B extends C, A, R1>(from: Schema<B, A, R1>) => Schema<D, A, R1 | R2>
   <C, B, R2>(
-    to: Schema<C, B, R2>
+    to: Schema<C, B, R2>,
+    options?: { readonly strict: true }
   ): <A, R1>(from: Schema<B, A, R1>) => Schema<C, A, R1 | R2>
   <D, C, R2>(
     to: Schema<D, C, R2>,
     options: { readonly strict: false }
   ): <B, A, R1>(from: Schema<B, A, R1>) => Schema<D, A, R1 | R2>
-  <B, A, R1, C, R2>(
-    from: Schema<B, A, R1>,
-    to: Schema<C, B, R2>,
-    options?: { readonly strict: true }
-  ): Schema<C, A, R1 | R2>
+
   <B, A, R1, D, C extends B, R2>(
     from: Schema<B, A, R1>,
     to: Schema<D, C, R2>
@@ -2548,6 +2555,11 @@ export const compose: {
     from: Schema<B, A, R1>,
     to: Schema<D, C, R2>
   ): Schema<D, A, R1 | R2>
+  <B, A, R1, C, R2>(
+    from: Schema<B, A, R1>,
+    to: Schema<C, B, R2>,
+    options?: { readonly strict: true }
+  ): Schema<C, A, R1 | R2>
   <B, A, R1, D, C, R2>(
     from: Schema<B, A, R1>,
     to: Schema<D, C, R2>,
@@ -2586,8 +2598,8 @@ export function filter<C extends A, B extends A, A = C>(
   annotations?: Annotations.Filter<A>
 ): <I, R>(self: Schema<C, I, R>) => Schema<C & B, I, R>
 export function filter<A>(
-  predicate: Predicate.Predicate<NoInfer<A>>,
-  annotations?: Annotations.Filter<NoInfer<A>>
+  predicate: Predicate.Predicate<Types.NoInfer<A>>,
+  annotations?: Annotations.Filter<Types.NoInfer<A>>
 ): <I, R>(self: Schema<A, I, R>) => Schema<A, I, R>
 export function filter<A>(
   predicate: Predicate.Predicate<A> | AST.Refinement["filter"],
@@ -2876,7 +2888,7 @@ export function transformLiterals<
  * @since 1.0.0
  */
 export const attachPropertySignature: {
-  <K extends PropertyKey, V extends AST.LiteralValue | symbol, A extends object>(
+  <K extends PropertyKey, V extends AST.LiteralValue | symbol, A>(
     key: K,
     value: V,
     annotations?: Annotations.Schema<Types.Simplify<A & { readonly [k in K]: V }>>
@@ -3130,7 +3142,7 @@ export const rename: {
  * @category type id
  * @since 1.0.0
  */
-export const TrimmedTypeId = Symbol.for("@effect/schema/TypeId/Trimmed")
+export const TrimmedTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/Trimmed")
 
 /**
  * Verifies that a string contains no leading or trailing whitespaces.
@@ -3221,7 +3233,7 @@ export const minLength = <A extends string>(
  * @category type id
  * @since 1.0.0
  */
-export const PatternTypeId = Symbol.for("@effect/schema/TypeId/Pattern")
+export const PatternTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/Pattern")
 
 /**
  * @category string filters
@@ -3255,7 +3267,7 @@ export const pattern = <A extends string>(
  * @category type id
  * @since 1.0.0
  */
-export const StartsWithTypeId = Symbol.for("@effect/schema/TypeId/StartsWith")
+export const StartsWithTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/StartsWith")
 
 /**
  * @category string filters
@@ -3282,7 +3294,7 @@ export const startsWith = <A extends string>(
  * @category type id
  * @since 1.0.0
  */
-export const EndsWithTypeId = Symbol.for("@effect/schema/TypeId/EndsWith")
+export const EndsWithTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/EndsWith")
 
 /**
  * @category string filters
@@ -3309,7 +3321,7 @@ export const endsWith = <A extends string>(
  * @category type id
  * @since 1.0.0
  */
-export const IncludesTypeId = Symbol.for("@effect/schema/TypeId/Includes")
+export const IncludesTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/Includes")
 
 /**
  * @category string filters
@@ -3336,7 +3348,7 @@ export const includes = <A extends string>(
  * @category type id
  * @since 1.0.0
  */
-export const LowercasedTypeId = Symbol.for("@effect/schema/TypeId/Lowercased")
+export const LowercasedTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/Lowercased")
 
 /**
  * Verifies that a string is lowercased.
@@ -3366,7 +3378,7 @@ export const Lowercased: $String = $String.pipe(
  * @category type id
  * @since 1.0.0
  */
-export const UppercasedTypeId = Symbol.for("@effect/schema/TypeId/Uppercased")
+export const UppercasedTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/Uppercased")
 
 /**
  * Verifies that a string is uppercased.
@@ -3518,7 +3530,7 @@ export const Trim: Trim = transform(
 ).annotations({ identifier: "Trim" })
 
 /**
- * Returns a achema that allows splitting a string into an array of strings.
+ * Returns a schema that allows splitting a string into an array of strings.
  *
  * @category string transformations
  * @since 1.0.0
@@ -3600,7 +3612,7 @@ export const NonEmpty: $String = $String.pipe(
  * @category type id
  * @since 1.0.0
  */
-export const UUIDTypeId = Symbol.for("@effect/schema/TypeId/UUID")
+export const UUIDTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/UUID")
 
 const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/i
 
@@ -3626,7 +3638,7 @@ export const UUID: $String = $String.pipe(
  * @category type id
  * @since 1.0.0
  */
-export const ULIDTypeId = Symbol.for("@effect/schema/TypeId/ULID")
+export const ULIDTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/ULID")
 
 const ulidRegex = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/i
 
@@ -3653,7 +3665,7 @@ export const ULID: $String = $String.pipe(
  * @category type id
  * @since 1.0.0
  */
-export const FiniteTypeId = Symbol.for("@effect/schema/TypeId/Finite")
+export const FiniteTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/Finite")
 
 /**
  * Ensures that the provided value is a finite number.
@@ -3741,7 +3753,7 @@ export const greaterThanOrEqualTo = <A extends number>(
  * @category type id
  * @since 1.0.0
  */
-export const MultipleOfTypeId = Symbol.for("@effect/schema/TypeId/MultipleOf")
+export const MultipleOfTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/MultipleOf")
 
 /**
  * @category number filters
@@ -3888,7 +3900,7 @@ export const between = <A extends number>(
  * @category type id
  * @since 1.0.0
  */
-export const NonNaNTypeId = Symbol.for("@effect/schema/TypeId/NonNaN")
+export const NonNaNTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/NonNaN")
 
 /**
  * @category number filters
@@ -4029,7 +4041,7 @@ export const NonNegative: $Number = $Number.pipe(
  * @category type id
  * @since 1.0.0
  */
-export const JsonNumberTypeId = Symbol.for("@effect/schema/TypeId/JsonNumber")
+export const JsonNumberTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/JsonNumber")
 
 /**
  * The `JsonNumber` is a schema for representing JSON numbers. It ensures that the provided value is a valid
@@ -4573,7 +4585,7 @@ export const clampDuration =
  * @category type id
  * @since 1.0.0
  */
-export const LessThanDurationTypeId = Symbol.for("@effect/schema/TypeId/LessThanDuration")
+export const LessThanDurationTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/LessThanDuration")
 
 /**
  * @category Duration filters
@@ -4596,7 +4608,7 @@ export const lessThanDuration = <A extends duration_.Duration>(
  * @category type id
  * @since 1.0.0
  */
-export const LessThanOrEqualToDurationTypeId = Symbol.for(
+export const LessThanOrEqualToDurationTypeId: unique symbol = Symbol.for(
   "@effect/schema/TypeId/LessThanOrEqualToDuration"
 )
 
@@ -4621,7 +4633,7 @@ export const lessThanOrEqualToDuration = <A extends duration_.Duration>(
  * @category type id
  * @since 1.0.0
  */
-export const GreaterThanDurationTypeId = Symbol.for("@effect/schema/TypeId/GreaterThanDuration")
+export const GreaterThanDurationTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/GreaterThanDuration")
 
 /**
  * @category Duration filters
@@ -4644,7 +4656,7 @@ export const greaterThanDuration = <A extends duration_.Duration>(
  * @category type id
  * @since 1.0.0
  */
-export const GreaterThanOrEqualToDurationTypeId = Symbol.for(
+export const GreaterThanOrEqualToDurationTypeId: unique symbol = Symbol.for(
   "@effect/schema/TypeId/GreaterThanOrEqualToDuration"
 )
 
@@ -4669,7 +4681,7 @@ export const greaterThanOrEqualToDuration = <A extends duration_.Duration>(
  * @category type id
  * @since 1.0.0
  */
-export const BetweenDurationTypeId = Symbol.for("@effect/schema/TypeId/BetweenDuration")
+export const BetweenDurationTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/BetweenDuration")
 
 /**
  * @category Duration filters
@@ -4917,7 +4929,7 @@ export const headOrElse: {
  * @category type id
  * @since 1.0.0
  */
-export const ValidDateTypeId = Symbol.for("@effect/schema/TypeId/ValidDate")
+export const ValidDateTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/ValidDate")
 
 /**
  * A filter that **excludes invalid** dates (e.g., `new Date("Invalid Date")` is rejected).
@@ -5049,10 +5061,11 @@ const optionEncoded = <A, I, R>(value: Schema<A, I, R>) =>
 const optionDecode = <A>(input: OptionEncoded<A>): option_.Option<A> =>
   input._tag === "None" ? option_.none() : option_.some(input.value)
 
-const optionArbitrary = <A>(value: LazyArbitrary<A>): LazyArbitrary<option_.Option<A>> => {
-  const arb = arbitrary_.makeLazy(optionEncoded(schemaFromArbitrary(value)))
-  return (fc) => arb(fc).map(optionDecode)
-}
+const optionArbitrary = <A>(value: LazyArbitrary<A>): LazyArbitrary<option_.Option<A>> => (fc) =>
+  fc.oneof(
+    fc.record({ _tag: fc.constant("None" as const) }),
+    fc.record({ _tag: fc.constant("Some" as const), value: value(fc) })
+  ).map(optionDecode)
 
 const optionPretty = <A>(value: pretty_.Pretty<A>): pretty_.Pretty<option_.Option<A>> =>
   option_.match({
@@ -5277,10 +5290,12 @@ const eitherDecode = <R, L>(input: EitherEncoded<R, L>): either_.Either<R, L> =>
 const eitherArbitrary = <R, L>(
   right: LazyArbitrary<R>,
   left: LazyArbitrary<L>
-): LazyArbitrary<either_.Either<R, L>> => {
-  const arb = arbitrary_.makeLazy(eitherEncoded(schemaFromArbitrary(right), schemaFromArbitrary(left)))
-  return (fc) => arb(fc).map(eitherDecode)
-}
+): LazyArbitrary<either_.Either<R, L>> =>
+(fc) =>
+  fc.oneof(
+    fc.record({ _tag: fc.constant("Left" as const), left: left(fc) }),
+    fc.record({ _tag: fc.constant("Right" as const), right: right(fc) })
+  ).map(eitherDecode)
 
 const eitherPretty = <R, L>(
   right: pretty_.Pretty<R>,
@@ -5790,7 +5805,7 @@ export const BigDecimalFromNumber: BigDecimalFromNumber = transformOrFail(
  * @category type id
  * @since 1.0.0
  */
-export const GreaterThanBigDecimalTypeId = Symbol.for("@effect/schema/TypeId/GreaterThanBigDecimal")
+export const GreaterThanBigDecimalTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/GreaterThanBigDecimal")
 
 /**
  * @category BigDecimal filters
@@ -5813,7 +5828,7 @@ export const greaterThanBigDecimal = <A extends bigDecimal_.BigDecimal>(
  * @category type id
  * @since 1.0.0
  */
-export const GreaterThanOrEqualToBigDecimalTypeId = Symbol.for(
+export const GreaterThanOrEqualToBigDecimalTypeId: unique symbol = Symbol.for(
   "@effect/schema/TypeId/GreaterThanOrEqualToBigDecimal"
 )
 
@@ -5838,7 +5853,7 @@ export const greaterThanOrEqualToBigDecimal = <A extends bigDecimal_.BigDecimal>
  * @category type id
  * @since 1.0.0
  */
-export const LessThanBigDecimalTypeId = Symbol.for("@effect/schema/TypeId/LessThanBigDecimal")
+export const LessThanBigDecimalTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/LessThanBigDecimal")
 
 /**
  * @category BigDecimal filters
@@ -5861,7 +5876,7 @@ export const lessThanBigDecimal = <A extends bigDecimal_.BigDecimal>(
  * @category type id
  * @since 1.0.0
  */
-export const LessThanOrEqualToBigDecimalTypeId = Symbol.for(
+export const LessThanOrEqualToBigDecimalTypeId: unique symbol = Symbol.for(
   "@effect/schema/TypeId/LessThanOrEqualToBigDecimal"
 )
 
@@ -5886,7 +5901,7 @@ export const lessThanOrEqualToBigDecimal = <A extends bigDecimal_.BigDecimal>(
  * @category type id
  * @since 1.0.0
  */
-export const PositiveBigDecimalTypeId = Symbol.for(
+export const PositiveBigDecimalTypeId: unique symbol = Symbol.for(
   "@effect/schema/TypeId/PositiveBigDecimal"
 )
 
@@ -5921,7 +5936,7 @@ export const PositiveBigDecimalFromSelf = BigDecimalFromSelf.pipe(
  * @category type id
  * @since 1.0.0
  */
-export const NonNegativeBigDecimalTypeId = Symbol.for(
+export const NonNegativeBigDecimalTypeId: unique symbol = Symbol.for(
   "@effect/schema/TypeId/NonNegativeBigDecimal"
 )
 
@@ -5956,7 +5971,7 @@ export const NonNegativeBigDecimalFromSelf = BigDecimalFromSelf.pipe(
  * @category type id
  * @since 1.0.0
  */
-export const NegativeBigDecimalTypeId = Symbol.for(
+export const NegativeBigDecimalTypeId: unique symbol = Symbol.for(
   "@effect/schema/TypeId/NegativeBigDecimal"
 )
 
@@ -5991,7 +6006,7 @@ export const NegativeBigDecimalFromSelf = BigDecimalFromSelf.pipe(
  * @category type id
  * @since 1.0.0
  */
-export const NonPositiveBigDecimalTypeId = Symbol.for(
+export const NonPositiveBigDecimalTypeId: unique symbol = Symbol.for(
   "@effect/schema/TypeId/NonPositiveBigDecimal"
 )
 
@@ -6026,7 +6041,7 @@ export const NonPositiveBigDecimalFromSelf = BigDecimalFromSelf.pipe(
  * @category type id
  * @since 1.0.0
  */
-export const BetweenBigDecimalTypeId = Symbol.for("@effect/schema/TypeId/BetweenBigDecimal")
+export const BetweenBigDecimalTypeId: unique symbol = Symbol.for("@effect/schema/TypeId/BetweenBigDecimal")
 
 /**
  * @category BigDecimal filters
@@ -6374,14 +6389,13 @@ export const TaggedError = <Self = never>(identifier?: string) =>
     tag: { _tag: tag },
     annotations,
     toStringOverride(self) {
-      if (!(Predicate.isString(self.message) && self.message.length > 0)) {
-        return pretty_.make(self.constructor as any)(self)
+      if ((Predicate.isString(self.message) && self.message.length > 0)) {
+        let message = `${self._tag}: ${self.message}`
+        if (Predicate.isString(self.stack)) {
+          message = `${message}\n${self.stack.split("\n").slice(1).join("\n")}`
+        }
+        return message
       }
-      let message = `${self._tag}: ${self.message}`
-      if (Predicate.isString(self.stack)) {
-        message = `${message}\n${self.stack.split("\n").slice(1).join("\n")}`
-      }
-      return message
     }
   })
 }
@@ -6481,7 +6495,7 @@ const makeClass = ({ Base, annotations, fields, fromSchema, identifier, kind, ta
   fromSchema?: Schema.Any | undefined
   tag?: { _tag: AST.LiteralValue } | undefined
   annotations?: Annotations.Schema<any> | undefined
-  toStringOverride?: ((self: any) => string) | undefined
+  toStringOverride?: (self: any) => string | undefined
 }): any => {
   const classSymbol = Symbol.for(`@effect/schema/${kind}/${identifier}`)
   const schema = fromSchema ?? Struct(fields)
@@ -6505,42 +6519,19 @@ const makeClass = ({ Base, annotations, fields, fromSchema, identifier, kind, ta
       super(props, true)
     }
 
+    // ----------------
+    // Schema interface
+    // ----------------
+
     static [TypeId] = variance
-
-    get [classSymbol]() {
-      return classSymbol
-    }
-
-    static pipe() {
-      return pipeArguments(this, arguments)
-    }
-
-    static annotations(annotations: Annotations.Schema<any>) {
-      return make(this.ast).annotations(annotations)
-    }
-
-    static toString() {
-      return `(${String(from)} <-> ${identifier})`
-    }
-
-    toString() {
-      return toStringOverride !== undefined ? toStringOverride(this) : pretty_.make(this.constructor as any)(this)
-    }
-
-    static fields = { ...fields }
-
-    static identifier = identifier
 
     static get ast() {
       const toSchema = typeSchema(schema)
       const guard = ParseResult.is(toSchema)
       const fallbackInstanceOf = (u: unknown) => Predicate.hasProperty(u, classSymbol) && guard(u)
       const encode = ParseResult.encodeUnknown(toSchema)
-      const pretty = pretty_.make(toSchema)
-      const arb = arbitrary_.makeLazy(toSchema)
-      const equivalence = equivalence_.make(toSchema)
       const declaration: Schema.Any = declare(
-        [],
+        [toSchema],
         {
           decode: () => (input, _, ast) =>
             input instanceof this || fallbackInstanceOf(input)
@@ -6558,9 +6549,9 @@ const makeClass = ({ Base, annotations, fields, fromSchema, identifier, kind, ta
           identifier,
           title: identifier,
           description: `an instance of ${identifier}`,
-          pretty: () => (self: any) => `${identifier}(${pretty(self)})`,
-          arbitrary: () => (fc: any) => arb(fc).map((props: any) => new this(props)),
-          equivalence: () => equivalence as any,
+          pretty: (pretty) => (self: any) => `${identifier}(${pretty(self)})`,
+          arbitrary: (arb) => (fc: any) => arb(fc).map((props: any) => new this(props)),
+          equivalence: identity,
           [AST.SurrogateAnnotationId]: toSchema.ast,
           ...annotations
         }
@@ -6572,6 +6563,26 @@ const makeClass = ({ Base, annotations, fields, fromSchema, identifier, kind, ta
       ).annotations({ [AST.SurrogateAnnotationId]: schema.ast })
       return transformation.ast
     }
+
+    static pipe() {
+      return pipeArguments(this, arguments)
+    }
+
+    static annotations(annotations: Annotations.Schema<any>) {
+      return make(this.ast).annotations(annotations)
+    }
+
+    static toString() {
+      return `(${String(from)} <-> ${identifier})`
+    }
+
+    // ----------------
+    // Class interface
+    // ----------------
+
+    static fields = { ...fields }
+
+    static identifier = identifier
 
     static extend<Extended>(identifier: string) {
       return (newFields: Struct.Fields, annotations?: Annotations.Schema<Extended>) => {
@@ -6624,6 +6635,27 @@ const makeClass = ({ Base, annotations, fields, fromSchema, identifier, kind, ta
         })
       }
     }
+
+    // ----------------
+    // other
+    // ----------------
+
+    get [classSymbol]() {
+      return classSymbol
+    }
+
+    toString() {
+      if (toStringOverride !== undefined) {
+        const out = toStringOverride(this)
+        if (out !== undefined) {
+          return out
+        }
+      }
+      return `${identifier}({ ${
+        util_.ownKeys(fields).map((p: any) => `${util_.formatPropertyKey(p)}: ${util_.formatUnknown(this[p])}`)
+          .join(", ")
+      } })`
+    }
   }
 }
 
@@ -6646,27 +6678,27 @@ export type FiberIdEncoded =
     readonly startTimeMillis: number
   }
 
-const FiberIdCompositeEncoded = Struct({
-  _tag: Literal("Composite"),
-  left: suspend(() => FiberIdEncoded),
-  right: suspend(() => FiberIdEncoded)
-}).annotations({ identifier: "FiberIdCompositeEncoded" })
-
 const FiberIdNoneEncoded = Struct({
   _tag: Literal("None")
 }).annotations({ identifier: "FiberIdNoneEncoded" })
 
 const FiberIdRuntimeEncoded = Struct({
   _tag: Literal("Runtime"),
-  id: Int.pipe(nonNegative({
+  id: Int.annotations({
     title: "id",
     description: "id"
-  })),
-  startTimeMillis: Int.pipe(nonNegative({
+  }),
+  startTimeMillis: Int.annotations({
     title: "startTimeMillis",
     description: "startTimeMillis"
-  }))
+  })
 }).annotations({ identifier: "FiberIdRuntimeEncoded" })
+
+const FiberIdCompositeEncoded = Struct({
+  _tag: Literal("Composite"),
+  left: suspend(() => FiberIdEncoded),
+  right: suspend(() => FiberIdEncoded)
+}).annotations({ identifier: "FiberIdCompositeEncoded" })
 
 const FiberIdEncoded: Schema<FiberIdEncoded> = Union(
   FiberIdNoneEncoded,
@@ -6674,9 +6706,13 @@ const FiberIdEncoded: Schema<FiberIdEncoded> = Union(
   FiberIdCompositeEncoded
 ).annotations({ identifier: "FiberIdEncoded" })
 
-const fiberIdFromArbitrary = arbitrary_.makeLazy(FiberIdEncoded)
-
-const fiberIdArbitrary: LazyArbitrary<fiberId_.FiberId> = (fc) => fiberIdFromArbitrary(fc).map(fiberIdDecode)
+const fiberIdArbitrary: LazyArbitrary<fiberId_.FiberId> = (fc) =>
+  fc.letrec((tie) => ({
+    None: fc.record({ _tag: fc.constant("None" as const) }),
+    Runtime: fc.record({ _tag: fc.constant("Runtime" as const), id: fc.integer(), startTimeMillis: fc.integer() }),
+    Composite: fc.record({ _tag: fc.constant("Composite" as const), left: tie("FiberId"), right: tie("FiberId") }),
+    FiberId: fc.oneof(tie("None"), tie("Runtime"), tie("Composite")) as any as fastCheck_.Arbitrary<fiberId_.FiberId>
+  })).FiberId.map(fiberIdDecode)
 
 const fiberIdPretty: pretty_.Pretty<fiberId_.FiberId> = (fiberId) => {
   switch (fiberId._tag) {
@@ -6835,10 +6871,24 @@ const causeEncoded = <E, EI, R1, R2>(
 const causeArbitrary = <E>(
   error: LazyArbitrary<E>,
   defect: LazyArbitrary<unknown>
-): LazyArbitrary<cause_.Cause<E>> => {
-  const arb = arbitrary_.makeLazy(causeEncoded(schemaFromArbitrary(error), schemaFromArbitrary(defect)))
-  return (fc) => arb(fc).map(causeDecode)
-}
+): LazyArbitrary<cause_.Cause<E>> =>
+(fc) =>
+  fc.letrec((tie) => ({
+    Empty: fc.record({ _tag: fc.constant("Empty" as const) }),
+    Fail: fc.record({ _tag: fc.constant("Fail" as const), error: error(fc) }),
+    Die: fc.record({ _tag: fc.constant("Die" as const), defect: defect(fc) }),
+    Interrupt: fc.record({ _tag: fc.constant("Interrupt" as const), fiberId: fiberIdArbitrary(fc) }),
+    Sequential: fc.record({ _tag: fc.constant("Sequential" as const), left: tie("Cause"), right: tie("Cause") }),
+    Parallel: fc.record({ _tag: fc.constant("Parallel" as const), left: tie("Cause"), right: tie("Cause") }),
+    Cause: fc.oneof(
+      tie("Empty"),
+      tie("Fail"),
+      tie("Die"),
+      tie("Interrupt"),
+      tie("Sequential"),
+      tie("Parallel")
+    ) as any as fastCheck_.Arbitrary<cause_.Cause<E>>
+  })).Cause.map(causeDecode)
 
 const causePretty = <E>(error: pretty_.Pretty<E>): pretty_.Pretty<cause_.Cause<E>> => (cause) => {
   const f = (cause: cause_.Cause<E>): string => {
@@ -7061,12 +7111,12 @@ const exitArbitrary = <A, E>(
   value: LazyArbitrary<A>,
   error: LazyArbitrary<E>,
   defect: LazyArbitrary<unknown>
-): LazyArbitrary<exit_.Exit<A, E>> => {
-  const arb = arbitrary_.makeLazy(
-    exitEncoded(schemaFromArbitrary(value), schemaFromArbitrary(error), schemaFromArbitrary(defect))
-  )
-  return (fc) => arb(fc).map(exitDecode)
-}
+): LazyArbitrary<exit_.Exit<A, E>> =>
+(fc) =>
+  fc.oneof(
+    fc.record({ _tag: fc.constant("Failure" as const), cause: causeArbitrary(error, defect)(fc) }),
+    fc.record({ _tag: fc.constant("Success" as const), value: value(fc) })
+  ).map(exitDecode)
 
 const exitPretty =
   <A, E>(value: pretty_.Pretty<A>, error: pretty_.Pretty<E>): pretty_.Pretty<exit_.Exit<A, E>> => (exit) =>
@@ -7525,11 +7575,6 @@ export const SortedSet = <Value extends Schema.Any>(
   )
 }
 
-const schemaFromArbitrary = <A>(value: LazyArbitrary<A>): Schema<A> =>
-  suspend<A, A, never>(() => Any).annotations({
-    [arbitrary_.ArbitraryHookId]: () => value
-  })
-
 /**
  * @category api interface
  * @since 1.0.0
@@ -7537,8 +7582,8 @@ const schemaFromArbitrary = <A>(value: LazyArbitrary<A>): Schema<A> =>
 export interface BooleanFromUnknown extends Annotable<BooleanFromUnknown, boolean, unknown> {}
 
 /**
- * Convers an arbitrary value to a `boolean` by testing whether it is truthy.
- * Uses `!!val` to convert the value to a `boolean`.
+ * Converts an arbitrary value to a `boolean` by testing whether it is truthy.
+ * Uses `!!val` to coerce the value to a `boolean`.
  *
  * @see https://developer.mozilla.org/docs/Glossary/Truthy
  * @category boolean constructors
