@@ -18,6 +18,7 @@ export type RegexElement = RegexConstruct | EncodeResult | string | RegExp;
  * Common interface for all regex constructs like character classes, quantifiers, and anchors.
  */
 export interface RegexConstruct {
+  _tag: string;
   type: string;
   encode(): EncodeResult;
 }

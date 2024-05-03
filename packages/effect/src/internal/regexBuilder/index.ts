@@ -6,6 +6,7 @@ export type * from './types.js';
 
 import type * as RegexBuilder from "../../RegexBuilder.js"
 
+
 /** @internal */
 const RegexBuilderSymbolKey = "effect/RegexBuilder"
 
@@ -13,9 +14,6 @@ const RegexBuilderSymbolKey = "effect/RegexBuilder"
 export const RegexBuilderTypeId: RegexBuilder.RegexBuilderTypeId = Symbol.for(
   RegexBuilderSymbolKey
 ) as RegexBuilder.RegexBuilderTypeId
-
-// Builders
-export { buildPattern, buildRegExp } from './builders.js';
 
 // Constructs
 export {
@@ -25,6 +23,7 @@ export {
     startOfString,
     wordBoundary
 } from './constructs/anchors.js';
+
 export { capture, ref } from './constructs/capture.js';
 export {
     any,
@@ -40,6 +39,7 @@ export {
     whitespace,
     word
 } from './constructs/character-class.js';
+
 export { choiceOf } from './constructs/choice-of.js';
 export { lookahead } from './constructs/lookahead.js';
 export { lookbehind } from './constructs/lookbehind.js';
@@ -48,4 +48,3 @@ export { negativeLookbehind } from './constructs/negative-lookbehind.js';
 export { oneOrMore, optional, zeroOrMore } from './constructs/quantifiers.js';
 export { regex } from './constructs/regex.js';
 export { repeat } from './constructs/repeat.js';
-

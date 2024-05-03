@@ -10,15 +10,12 @@ import { hasProperty } from "./Predicate.js"
 import * as Hash from "./Hash.js"
 import type { Mutable } from "./Types.js"
 import { pipe } from "./Function.js"
-
 import * as internal from "./internal/regexBuilder/index.js"
 
 // Types
 import { encodeSequence } from './internal/regexBuilder/encoder/encoder.js';
 import { ensureArray } from './internal/regexBuilder/utils/elements.js';
 import { RegexSequence, RegexFlags } from "./internal/regexBuilder/index.js"
-
-export type ArrayOrSingle<T> = T[] | T;
 
 /**
  * @since 2.0.0
@@ -31,21 +28,6 @@ export const RegexBuilderTypeId: unique symbol = internal.RegexBuilderTypeId
  * @category symbols
  */
 export type RegexBuilderTypeId = typeof RegexBuilderTypeId
-
-import type { EncodeResult } from './internal/regexBuilder/encoder/types.js';
-
-/**
- * Fundamental building block of a regular expression, defined as either a regex construct or a string.
- */
-export type RegexElement = RegexConstruct | string | RegExp;
-
-/**
- * Common interface for all regex constructs like character classes, quantifiers, and anchors.
- */
-export interface RegexConstruct {
-  type: string;
-  encode(): EncodeResult;
-}
 
 /**
  * A `RegexBuilder<A, E>` is a ...
