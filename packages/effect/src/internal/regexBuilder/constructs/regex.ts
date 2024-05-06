@@ -1,6 +1,6 @@
 import { encodeSequence } from '../encoder/encoder.js';
 import type { EncodeResult } from '../encoder/types.js';
-import type { RegexConstruct, RegexElement, RegexSequence } from '../types.js';
+import type { RegexConstruct, RegexConstructType, RegexElement, RegexSequence } from '../types.js';
 import { ensureArray } from '../utils/elements.js';
 // import type { RegexBuilderTypeId } from '../../../RegexBuilder.js';
 
@@ -35,16 +35,16 @@ export function makeRegex(
 ***/
 
 export interface Regex extends RegexConstruct {
-  _tag: "regex",
-  type: 'sequence';
+  _tag: "RegexConstruct",
+  type: RegexConstructType;
   children: RegexElement[];
   encode: typeof encodeRegex
 }
 
 export function regex(sequence: RegexSequence ): Regex {
   return {
-    _tag: 'regex',
-    type: 'sequence',
+    _tag: 'RegexConstruct',
+    type: 'regex',
     children: ensureArray(sequence),
     encode: encodeRegex,
   };

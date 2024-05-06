@@ -1,5 +1,5 @@
 /**
- * @since 3.0.0
+ * @since 3.1.0
  */
 
 import * as Arr from "./Array.js"
@@ -11,20 +11,18 @@ import * as Hash from "./Hash.js"
 import type { Mutable } from "./Types.js"
 import { pipe } from "./Function.js"
 import * as internal from "./internal/regexBuilder/index.js"
-
-// Types
 import { encodeSequence } from './internal/regexBuilder/encoder/encoder.js';
 import { ensureArray } from './internal/regexBuilder/utils/elements.js';
 import { RegexSequence, RegexFlags } from "./internal/regexBuilder/index.js"
 
 /**
- * @since 2.0.0
+ * @since 3.1.0
  * @category symbols
  */
 export const RegexBuilderTypeId: unique symbol = internal.RegexBuilderTypeId
 
 /**
- * @since 2.0.0
+ * @since 3.1.0
  * @category symbols
  */
 export type RegexBuilderTypeId = typeof RegexBuilderTypeId
@@ -32,7 +30,7 @@ export type RegexBuilderTypeId = typeof RegexBuilderTypeId
 /**
  * A `RegexBuilder<A, E>` is a ...
  *
- * @since 2.0.0
+ * @since 3.1.0
  * @category models
  */
 export interface RegexBuilder extends Equal.Equal, Inspectable {
@@ -66,7 +64,7 @@ const RegexBuilderProto: Omit<RegexBuilder, "sequence" | "flags"> = {
   },
   toJSON(this: RegexBuilder) {
     return {
-      _id: "RegexBuilder"
+      _tag: "RegexBuilder"
     }
   },
   [NodeInspectSymbol](this: RegexBuilder) {
@@ -75,21 +73,22 @@ const RegexBuilderProto: Omit<RegexBuilder, "sequence" | "flags"> = {
 } as const
 
 /**
- * Checks if a given value is a `Cron` instance.
+ * Checks if a given value is a `RegexBuilder` instance.
  *
  * @param u - The value to check.
  *
- * @since 2.0.0
+ * @since 3.1.0
  * @category guards
  */
 export const isRegexBuilder = (u: unknown): u is RegexBuilder => hasProperty(u, RegexBuilderTypeId)
 
 /**
- * Creates a `RegexBuilder` instance from.
+ * Creates a `RegexBuilder` instance from:
  *
- * @param constraints - The RegexBuilder constraints.
+ * @param sequence - The Regex sequence to be used to build the RegexBuilder.
+ * @param flags    - The optional flags for the regex.
  *
- * @since 2.0.0
+ * @since 3.1.0
  * @category constructors
  */
 export const make = ({
@@ -112,7 +111,7 @@ export const make = ({
  * @param flags RegExp flags object
  * @returns RegExp object
  *
- * @since 2.0.0
+ * @since 3.1.0
  * @category constructors
  */
 export const buildRegex = (elements: RegexSequence, flags?: RegexFlags): RegExp => {
@@ -122,6 +121,7 @@ export const buildRegex = (elements: RegexSequence, flags?: RegexFlags): RegExp 
 }
 
 /**
+ * @since 3.1.0
  * Generate regex pattern from elements.
  * @param elements Single regex element or array of elements
  * @returns regex pattern string
@@ -129,6 +129,7 @@ export const buildRegex = (elements: RegexSequence, flags?: RegexFlags): RegExp 
 export function buildPattern(sequence: RegexSequence): string {
   return encodeSequence(ensureArray(sequence)).pattern;
 }
+
 
 function encodeFlags(flags: RegexFlags): string {
   console.log('encodeFlags(%s)', flags)
@@ -145,10 +146,10 @@ function encodeFlags(flags: RegexFlags): string {
 }
 
 import type { CaptureOptions } from './internal/regexBuilder/constructs/capture.ts';
-import { ref }  from './internal/regexBuilder/constructs/capture.js';
-import { capture } from './internal/regexBuilder/constructs/capture.js';
 export type { QuantifierOptions } from './internal/regexBuilder/constructs/quantifiers.ts';
 export type { RepeatOptions } from './internal/regexBuilder/constructs/repeat.ts';
+import { ref }  from './internal/regexBuilder/constructs/capture.js';
+import { capture } from './internal/regexBuilder/constructs/capture.js';
 
 // Constructs
 import {
@@ -179,33 +180,452 @@ import { oneOrMore, optional, zeroOrMore } from './internal/regexBuilder/constru
 import { regex } from './internal/regexBuilder/constructs/regex.js';
 import { repeat } from './internal/regexBuilder/constructs/repeat.js';
 
-export {
-  any,
-  anyOf,
-  capture,
-  CaptureOptions,
-  charClass,
-  charRange,
-  choiceOf,
-  digit,
-  endOfString,
-  lookahead,
-  lookbehind,
-  negated,
-  negativeLookahead,
-  negativeLookbehind,
-  nonDigit,
-  nonWhitespace,
-  nonWord,
-  nonWordBoundary,
-  oneOrMore,
-  optional,
-  ref,
-  regex,
-  repeat,
-  startOfString,
-  whitespace,
-  word,
-  wordBoundary,
-  zeroOrMore,
-}
+/**
+ * Returns a character class that matches any single character. 
+ * Regex syntax: .
+ *
+ * @example
+ * import { any } from "effect/RegexBuilder"
+ *
+ * const regex = any  // Matches only a single character.
+ *
+ * assert.toMatchRegex(/./)
+ *
+ * @since 3.1.0
+ */
+
+export { any }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { anyOf }
+
+/**
+ *
+ * Name to be given to the capturing group.
+ *
+ * @example
+ * import type { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export type { CaptureOptions }
+
+/**
+ *
+ * Name to be given to the capturing group.
+ *
+ * @example
+ * import type { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { capture }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { CaptureOptions } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { charClass }
+
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { charRange }
+
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { choiceOf }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { digit }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { endOfString }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { lookahead }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { lookbehind }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { negated } 
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { negativeLookahead }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { negativeLookbehind }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { nonDigit }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { nonWhitespace }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { nonWord }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { nonWordBoundary }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { oneOrMore }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { optional }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { ref }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { regex }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { repeat }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { startOfString }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { whitespace }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { word }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { wordBoundary }
+
+/**
+ * Returns a character class that matches any character in the given string or sequence.
+ * Regex syntax: [...]
+ *
+ * @example
+ * import { anyOf } from "effect/RegexBuilder"
+ *
+ * const regex = anyOf("ABC")  // Matches any of "A", "B", or "C".
+ *
+ * assert.toMatchRegex(/[ABC]/)
+ *
+ * @since 3.1.0
+ */
+
+export { zeroOrMore }

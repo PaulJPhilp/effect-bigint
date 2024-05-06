@@ -14,12 +14,48 @@ export type RegexSequence = RegexElement[] | RegexElement;
  */
 export type RegexElement = RegexConstruct | EncodeResult | string | RegExp;
 
+export type RegexConstructType =
+  | "anchor"
+  | "any"
+  | "anyOf"
+  | "any"
+  | "anyOf"
+  | "atom"
+  | "capture"
+  | "charClass"
+  | "charRange"
+  | "choiceOf"
+  | "digit"
+  | "endOfString"
+  | "lookahead"
+  | "lookbehind"
+  | "negated"
+  | "negativeLookahead"
+  | "negativeLookbehind"
+  | "nonDigit"
+  | "nonWhitespace"
+  | "nonWord"
+  | "nonWordBoundary"
+  | "oneOrMore"
+  | "optional"
+  | "ref"
+  | "regex"
+  | "regexp"
+  | "repeat"
+  | "sequence"
+  | "startOfString"
+  | "text"
+  | "whitespace"
+  | "word"
+  | "wordBoundary"
+  | "zeroOrMore"
+
 /**
  * Common interface for all regex constructs like character classes, quantifiers, and anchors.
  */
 export interface RegexConstruct {
-  _tag: string;
-  type: string;
+  _tag: "RegexConstruct";
+  type: RegexConstructType;
   encode(): EncodeResult;
 }
 

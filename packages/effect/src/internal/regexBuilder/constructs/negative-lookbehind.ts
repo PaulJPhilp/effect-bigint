@@ -24,6 +24,7 @@ export interface NegativeLookbehind extends RegexConstruct {
 
 export function negativeLookbehind(sequence: RegexSequence): NegativeLookbehind {
   return {
+    _tag: "RegexConstruct",
     type: 'negativeLookbehind',
     children: ensureArray(sequence),
     encode: encodeNegativeLookbehind,
@@ -32,6 +33,8 @@ export function negativeLookbehind(sequence: RegexSequence): NegativeLookbehind 
 
 function encodeNegativeLookbehind(this: NegativeLookbehind): EncodeResult {
   return {
+    _tag: "EncodeResult",
+    type: "negativeLookbehind",
     precedence: 'atom',
     pattern: `(?<!${encodeSequence(this.children).pattern})`,
   };

@@ -14,6 +14,7 @@ export function choiceOf(...alternatives: RegexSequence[]): ChoiceOf {
   }
 
   return {
+    _tag: "RegexConstruct",
     type: 'choiceOf',
     alternatives: alternatives.map((c) => ensureArray(c)),
     encode: encodeChoiceOf,
@@ -27,6 +28,8 @@ function encodeChoiceOf(this: ChoiceOf): EncodeResult {
   }
 
   return {
+    _tag: "EncodeResult",
+    type: "choiceOf",
     precedence: 'disjunction',
     pattern: encodedAlternatives.map((n) => n.pattern).join('|'),
   };

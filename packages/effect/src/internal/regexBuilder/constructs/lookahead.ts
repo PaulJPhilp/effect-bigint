@@ -24,6 +24,7 @@ export interface Lookahead extends RegexConstruct {
 
 export function lookahead(sequence: RegexSequence): Lookahead {
   return {
+    _tag: "RegexConstruct",
     type: 'lookahead',
     children: ensureArray(sequence),
     encode: encodeLookahead,
@@ -32,6 +33,8 @@ export function lookahead(sequence: RegexSequence): Lookahead {
 
 function encodeLookahead(this: Lookahead): EncodeResult {
   return {
+    _tag: "EncodeResult",
+    type: "lookahead",
     precedence: 'atom',
     pattern: `(?=${encodeSequence(this.children).pattern})`,
   };

@@ -627,6 +627,11 @@ export * as Ref from "./Ref.js"
 export * as RegExp from "./RegExp.js"
 
 /**
+ * @since 3.1.0
+ */
+export * as RegexBuilder from "./RegexBuilder.js"
+
+/**
  * @since 2.0.0
  */
 export * as Reloadable from "./Reloadable.js"

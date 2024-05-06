@@ -4,7 +4,7 @@ export type { QuantifierOptions } from './constructs/quantifiers.js';
 export type { RepeatOptions } from './constructs/repeat.js';
 export type * from './types.js';
 
-import type * as RegexBuilder from "../../RegexBuilder.js"
+import * as RegexBuilder from "../../RegexBuilder.js"
 
 
 /** @internal */

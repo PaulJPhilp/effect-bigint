@@ -1,8 +1,8 @@
 import type { EncodeResult } from '../encoder/types.js';
-import type { RegexConstruct } from '../types.js';
+import type { RegexConstruct, RegexConstructType } from '../types.js';
 
 export interface CharacterClass extends RegexConstruct {
-  type: 'characterClass';
+  type: RegexConstructType
   escape?: string;
   chars: string[];
   ranges: CharacterRange[];
@@ -19,7 +19,8 @@ export interface CharacterRange {
 }
 
 export const any: CharacterClass = {
-  type: 'characterClass',
+  _tag: "RegexConstruct",
+  type: 'any',
   escape: '.',
   chars: [],
   ranges: [],
@@ -28,7 +29,8 @@ export const any: CharacterClass = {
 };
 
 export const digit: CharacterClass = {
-  type: 'characterClass',
+  _tag: "RegexConstruct",
+  type: 'digit',
   escape: '\\d',
   chars: [],
   ranges: [],
@@ -37,7 +39,8 @@ export const digit: CharacterClass = {
 };
 
 export const nonDigit: CharacterClass = {
-  type: 'characterClass',
+  _tag: "RegexConstruct",
+  type: 'nonDigit',
   escape: '\\D',
   chars: [],
   ranges: [],
@@ -46,7 +49,8 @@ export const nonDigit: CharacterClass = {
 };
 
 export const word: CharacterClass = {
-  type: 'characterClass',
+  _tag: "RegexConstruct",
+  type: 'word',
   escape: '\\w',
   chars: [],
   ranges: [],
@@ -55,7 +59,8 @@ export const word: CharacterClass = {
 };
 
 export const nonWord: CharacterClass = {
-  type: 'characterClass',
+  _tag: "RegexConstruct",
+  type: 'nonWord',
   escape: '\\W',
   chars: [],
   ranges: [],
@@ -64,7 +69,8 @@ export const nonWord: CharacterClass = {
 };
 
 export const whitespace: CharacterClass = {
-  type: 'characterClass',
+  _tag: "RegexConstruct",
+  type: 'whitespace',
   escape: '\\s',
   chars: [],
   ranges: [],
@@ -73,7 +79,8 @@ export const whitespace: CharacterClass = {
 };
 
 export const nonWhitespace: CharacterClass = {
-  type: 'characterClass',
+  _tag: "RegexConstruct",
+  type: 'nonWhitespace',
   escape: '\\S',
   chars: [],
   ranges: [],
@@ -106,7 +113,8 @@ export function charClass(...elements: CharacterClass[]): CharacterClass {
   }
 
   return {
-    type: 'characterClass',
+    _tag: "RegexConstruct",
+    type: 'nonWhitespace',
     chars: elements.map((c) => getAllChars(c)).flat(),
     ranges: elements.map((c) => c.ranges).flat(),
     isNegated: false,
@@ -128,7 +136,8 @@ export function charRange(start: string, end: string): CharacterClass {
   }
 
   return {
-    type: 'characterClass',
+    _tag: "RegexConstruct",
+    type: 'charRange',
     chars: [],
     ranges: [{ start, end }],
     isNegated: false,
@@ -144,7 +153,8 @@ export function anyOf(characters: string): CharacterClass {
   }
 
   return {
-    type: 'characterClass',
+    _tag: "RegexConstruct",
+    type: 'anyOf',
     chars,
     ranges: [],
     isNegated: false,
@@ -154,7 +164,8 @@ export function anyOf(characters: string): CharacterClass {
 
 export function negated(element: CharacterClass): CharacterClass {
   return {
-    type: 'characterClass',
+    _tag: "RegexConstruct",
+    type: 'negated',
     chars: element.chars,
     ranges: element.ranges,
     isNegated: !element.isNegated,
@@ -175,6 +186,8 @@ function encodeCharacterClass(this: CharacterClass): EncodeResult {
   // Direct rendering for single-character class
   if (this.escape !== undefined && !this.chars.length && !this.ranges.length && !this.isNegated) {
     return {
+      _tag: "EncodeResult",
+      type: "charClass",
       precedence: 'atom',
       pattern: this.escape,
     };
@@ -195,6 +208,8 @@ function encodeCharacterClass(this: CharacterClass): EncodeResult {
   if (pattern === '[^-]') pattern = '[\\^-]';
 
   return {
+    _tag: "EncodeResult",
+    type: "charClass",
     precedence: 'atom',
     pattern,
   };

@@ -20,11 +20,10 @@ function encodeNode(element: RegexElement): EncodeResult {
     return encodeRegExp(element);
   }
 
-  if (typeof element.encode !== 'function') {
-    throw new Error(`\`encodeNode\`: unknown element type ${element.type}`);
-  }
+  if ("encode" in element && typeof element.encode === 'function') return element.encode();
+  throw new Error(`\`encodeNode\`: unknown element type ${element.type}`);
 
-  return element.encode();
+  
 }
 
 function encodeText(text: string): EncodeResult {
@@ -35,12 +34,16 @@ function encodeText(text: string): EncodeResult {
   // Optimize for single character case
   if (text.length === 1) {
     return {
+      _tag: "EncodeResult",
+      type: "text",
       precedence: 'atom',
       pattern: escapeText(text),
     };
   }
 
   return {
+    _tag: "EncodeResult",
+    type: "text",
     precedence: 'sequence',
     pattern: escapeText(text),
   };
@@ -51,6 +54,8 @@ function encodeRegExp(regexp: RegExp): EncodeResult {
 
   // Encode at safe precedence
   return {
+    _tag: "EncodeResult",
+    type: "regexp",
     precedence: isAtomicPattern(pattern) ? 'atom' : 'disjunction',
     pattern,
   };
@@ -79,6 +84,8 @@ function concatSequence(encoded: EncodeResult[]): EncodeResult {
   }
 
   return {
+    _tag: "EncodeResult",
+    type: "sequence",
     precedence: 'sequence',
     pattern: encoded
       .map((n) => (n.precedence === 'disjunction' ? wrapAtom(n) : n).pattern)
@@ -92,6 +99,8 @@ function wrapAtom(encoded: EncodeResult): EncodeResult {
   }
 
   return {
+    _tag: "EncodeResult",
+    type: "atom",
     precedence: 'atom',
     pattern: `(?:${encoded.pattern})`,
   };

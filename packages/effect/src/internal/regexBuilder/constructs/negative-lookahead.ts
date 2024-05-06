@@ -24,6 +24,7 @@ export interface NegativeLookahead extends RegexConstruct {
 
 export function negativeLookahead(sequence: RegexSequence): NegativeLookahead {
   return {
+    _tag: "RegexConstruct",
     type: 'negativeLookahead',
     children: ensureArray(sequence),
     encode: encodeNegativeLookahead,
@@ -32,6 +33,8 @@ export function negativeLookahead(sequence: RegexSequence): NegativeLookahead {
 
 function encodeNegativeLookahead(this: NegativeLookahead): EncodeResult {
   return {
+    _tag: "EncodeResult",
+    type: "negativeLookahead",
     precedence: 'atom',
     pattern: `(?!${encodeSequence(this.children).pattern})`,
   };

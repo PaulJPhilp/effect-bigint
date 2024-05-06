@@ -4,6 +4,7 @@ import type { RegexConstruct, RegexElement, RegexSequence } from '../types.js';
 import { ensureArray } from '../utils/elements.js';
 
 export interface Repeat extends RegexConstruct {
+  _tag: "RegexConstruct",
   type: 'repeat';
   children: RegexElement[];
   options: RepeatOptions;
@@ -19,6 +20,7 @@ export function repeat(sequence: RegexSequence, options: RepeatOptions): Repeat 
   }
 
   return {
+    _tag: "RegexConstruct",
     type: 'repeat',
     children,
     options,
@@ -31,12 +33,16 @@ function encodeRepeat(this: Repeat): EncodeResult {
 
   if (typeof this.options === 'number') {
     return {
+      _tag: "EncodeResult",
+      type: "repeat",
       precedence: 'sequence',
       pattern: `${atomicNodes.pattern}{${this.options}}`,
     };
   }
 
   return {
+    _tag: "EncodeResult",
+     type: "repeat",
     precedence: 'sequence',
     pattern: `${atomicNodes.pattern}{${this.options.min},${this.options?.max ?? ''}}${
       this.options.greedy === false ? '?' : ''

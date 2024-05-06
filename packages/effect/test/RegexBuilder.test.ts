@@ -642,7 +642,7 @@ test('`encodeCharacterClass` throws on empty text', () => {
     buildRegex(
       // @ts-expect-error
       negated({
-        type: 'characterClass',
+        type: 'charClass',
         chars: [],
         ranges: [],
         isNegated: false,

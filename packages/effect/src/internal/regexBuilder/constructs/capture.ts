@@ -1,10 +1,11 @@
 import { encodeSequence } from '../encoder/encoder.js';
 import type { EncodeResult } from '../encoder/types.js';
-import type { RegexConstruct, RegexElement, RegexSequence } from '../types.js';
+import type { RegexConstruct, RegexConstructType, RegexElement, RegexSequence } from '../types.js';
 import { ensureArray } from '../utils/elements.js';
 
 export interface Capture extends RegexConstruct {
-  type: 'capture';
+  _tag: "RegexConstruct",
+  type: RegexConstructType;
   children: RegexElement[];
   options?: CaptureOptions;
 }
@@ -17,7 +18,8 @@ export type CaptureOptions = {
 };
 
 export interface Reference extends RegexConstruct {
-  type: 'reference';
+  _tag: "RegexConstruct",
+  type: 'ref';
   name: string;
 }
 
@@ -28,6 +30,7 @@ export interface Reference extends RegexConstruct {
  */
 export function capture(sequence: RegexSequence, options?: CaptureOptions): Capture {
   const result: Capture = {
+    _tag: "RegexConstruct",
     type: 'capture',
     children: ensureArray(sequence),
     encode: encodeCapture
@@ -47,7 +50,8 @@ export function capture(sequence: RegexSequence, options?: CaptureOptions): Capt
  */
 export function ref(name: string): Reference {
   return {
-    type: 'reference',
+    _tag: "RegexConstruct",
+    type: 'ref',
     name,
     encode: encodeReference,
   };
@@ -57,12 +61,16 @@ function encodeCapture(this: Capture): EncodeResult {
   const name = this.options?.name;
   if (name) {
     return {
+      _tag: "EncodeResult",
+      type: "capture",
       precedence: 'atom',
       pattern: `(?<${name}>${encodeSequence(this.children).pattern})`,
     };
   }
 
   return {
+    _tag: "EncodeResult",
+    type: "capture",
     precedence: 'atom',
     pattern: `(${encodeSequence(this.children).pattern})`,
   };
@@ -70,6 +78,8 @@ function encodeCapture(this: Capture): EncodeResult {
 
 function encodeReference(this: Reference): EncodeResult {
   return {
+    _tag: "EncodeResult",
+    type: "ref",
     precedence: 'atom',
     pattern: `\\k<${this.name}>`,
   };

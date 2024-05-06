@@ -7,52 +7,66 @@ export interface QuantifierOptions {
   greedy?: boolean;
 }
 export interface ZeroOrMore extends RegexConstruct {
+  _tag: "RegexConstruct",
   type: 'zeroOrMore';
   children: RegexElement[];
   options?: QuantifierOptions;
 }
 
 export interface OneOrMore extends RegexConstruct {
+  _tag: "RegexConstruct",
   type: 'oneOrMore';
   children: RegexElement[];
   options?: QuantifierOptions;
 }
 
 export interface Optional extends RegexConstruct {
+  _tag: "RegexConstruct",
   type: 'optional';
   children: RegexElement[];
   options?: QuantifierOptions;
 }
 
 export function zeroOrMore(sequence: RegexSequence, options?: QuantifierOptions): ZeroOrMore {
-  return {
+  const z: ZeroOrMore = {
+    _tag: "RegexConstruct",
     type: 'zeroOrMore',
     children: ensureArray(sequence),
-    options,
     encode: encodeZeroOrMore,
   };
+
+  if (options) z.options = options
+  return z
 }
 
 export function oneOrMore(sequence: RegexSequence, options?: QuantifierOptions): OneOrMore {
-  return {
+  const o: OneOrMore = {
+    _tag: "RegexConstruct",
     type: 'oneOrMore',
     children: ensureArray(sequence),
-    options,
     encode: encodeOneOrMore,
   };
+
+  if (options) o.options = options
+  return o
 }
 
 export function optional(sequence: RegexSequence, options?: QuantifierOptions): Optional {
-  return {
+  const o: Optional = {
+    _tag: "RegexConstruct",
     type: 'optional',
     children: ensureArray(sequence),
-    options,
     encode: encodeOptional,
   };
+
+  if (options) o.options = options
+  return o
 }
 
 function encodeZeroOrMore(this: ZeroOrMore): EncodeResult {
   return {
+    _tag: "EncodeResult",
+    type: "zeroOrMore",
     precedence: 'sequence',
     pattern: `${encodeAtom(this.children).pattern}*${this.options?.greedy === false ? '?' : ''}`,
   };
@@ -60,6 +74,8 @@ function encodeZeroOrMore(this: ZeroOrMore): EncodeResult {
 
 function encodeOneOrMore(this: OneOrMore): EncodeResult {
   return {
+    _tag: "EncodeResult",
+    type: "oneOrMore",
     precedence: 'sequence',
     pattern: `${encodeAtom(this.children).pattern}+${this.options?.greedy === false ? '?' : ''}`,
   };
@@ -67,6 +83,8 @@ function encodeOneOrMore(this: OneOrMore): EncodeResult {
 
 function encodeOptional(this: Optional): EncodeResult {
   return {
+    _tag: "EncodeResult",
+    type: "optional",
     precedence: 'sequence',
     pattern: `${encodeAtom(this.children).pattern}?${this.options?.greedy === false ? '?' : ''}`,
   };

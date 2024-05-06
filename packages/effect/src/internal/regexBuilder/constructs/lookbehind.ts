@@ -24,6 +24,7 @@ export interface Lookbehind extends RegexConstruct {
 
 export function lookbehind(sequence: RegexSequence): Lookbehind {
   return {
+    _tag: "RegexConstruct",
     type: 'lookbehind',
     children: ensureArray(sequence),
     encode: encodeLookbehind,
@@ -32,6 +33,8 @@ export function lookbehind(sequence: RegexSequence): Lookbehind {
 
 function encodeLookbehind(this: Lookbehind): EncodeResult {
   return {
+    _tag: "EncodeResult",
+    type: "lookbehind",
     precedence: 'atom',
     pattern: `(?<=${encodeSequence(this.children).pattern})`,
   };
