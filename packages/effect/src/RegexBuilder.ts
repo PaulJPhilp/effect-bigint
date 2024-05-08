@@ -2,6 +2,7 @@
  * @since 3.1.0
  */
 
+import * as Effect from "./Effect.js"
 import * as Arr from "./Array.js"
 import type * as _Cache from "./Cache.js"
 import * as Equal from "./Equal.js"
@@ -38,6 +39,17 @@ export interface RegexBuilder extends Equal.Equal, Inspectable {
   readonly [RegexBuilderTypeId]: RegexBuilderTypeId
   readonly sequence: Readonly<RegexSequence>
   readonly flags: Readonly<RegexFlags>
+}
+
+
+
+
+
+const debug = (sequence: Readonly<RegexSequence>, level?: number) => {
+  let str = ""
+  for (let i = 0; i < level; i++) {
+    str += "\t"
+  }
 }
 
 const RegexBuilderProto: Omit<RegexBuilder, "sequence" | "flags"> = {

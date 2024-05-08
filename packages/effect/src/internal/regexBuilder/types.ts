@@ -2,6 +2,25 @@ import type { EncodeResult } from './encoder/types.js'
 
 export type ArrayOrSingle<T> = T[] | T;
 
+interface IVisitable {
+  accept(visitor: RegexVisitor): void;
+}
+
+interface RegexVisitor {
+  visitSequence(element: RegexSequence): void;
+  visitElement(element: RegExpConstructor): void;
+}
+
+class RegexSequenceVisitor implements RegexVisitor {
+  visitSequence(element: RegexSequence): void {
+    if (element instanceof Array) {
+      element.debug()
+    }
+  }
+  visitElement(element: RegExpConstructor): void {}
+}
+
+
 /**
  * Sequence of regex elements forming a regular expression.
  *
@@ -53,10 +72,11 @@ export type RegexConstructType =
 /**
  * Common interface for all regex constructs like character classes, quantifiers, and anchors.
  */
-export interface RegexConstruct {
+export interface RegexConstruct  {
   _tag: "RegexConstruct";
   type: RegexConstructType;
   encode(): EncodeResult;
+  debug(): RegexSequenceVisitor
 }
 
 /**
