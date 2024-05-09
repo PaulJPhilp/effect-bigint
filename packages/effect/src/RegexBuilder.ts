@@ -43,8 +43,6 @@ export interface RegexBuilder extends Equal.Equal, Inspectable {
 
 
 
-
-
 const debug = (sequence: Readonly<RegexSequence>, level?: number) => {
   let str = ""
   for (let i = 0; i < level; i++) {
