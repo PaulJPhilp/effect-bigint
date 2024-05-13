@@ -1,46 +1,90 @@
-import * as Context from './Context.js'
 
-export interface Visitable<T> { 
-    accept(visitor: Visitor<T>): void
+/**
+ * @since 3.0.0
+ */
+
+import * as Inspectable from './Inspectable.js'
+
+type VoidFunction = () => void
+
+/**
+ * @since 3.0.0
+ * @category symbol
+ */
+
+export const TypeId: unique symbol = Symbol.for("effect/Explorer")
+export type TypeId = typeof TypeId
+export const ExploreableTypeId: unique symbol = Symbol.for("effect/Exploreable")
+export type ExploreableTypeId = typeof ExploreableTypeId
+export const ExploreableSymbol = Symbol.for("nodejs.util.exploreable.custom")
+export type ExploreableSymbol = typeof ExploreableSymbol
+export const ExplorerSymbol = Symbol.for("nodejs.util.explorer.custom")
+export type ExplorerSymbol = typeof ExplorerSymbol
+
+/**
+ * @since 3.0.0
+ * @category models
+ */
+export interface Exploreable extends Inspectable.Inspectable {
+    accept: VoidFunction
+    toJSON(): unknown
+    toString(): string
 }
 
-export interface VisitableImpl<T> { 
-    accept(visitor: Visitable<T>): void
+export abstract class ExploreableClass implements Inspectable.Inspectable, Exploreable {
+    abstract accept(): unknown
+    abstract toJSON(): unknown
+    [ExploreableSymbol]() {
+        return this.accept()
+    }
+    [Inspectable.NodeInspectSymbol]() {
+        return this.toJSON()
+    }
 }
 
-export const Visitable = Context.Tag("@app/Visitable");
-
-export interface Visitor<T> { 
-
-    visit(element: Visitable<T>): void;
+export interface Explorer {
+    readonly [ExploreableSymbol]: unknown
+    explore: (item: Exploreable) => void
 }
 
-export interface VisitorImpl<T> { 
-    accept(visitor: Visitable<T>): void
+export abstract class ExplorerClass {
+    abstract explore(item: Exploreable): unknown
+    [ExploreableSymbol](item: Exploreable) {
+        return this.explore(item)
+    }
 }
 
-export const Visitor = Context.Tag("@app/Visitor");
-
-abstract class AbstractVisitable<T extends Object> implements Visitable<T> {
-  public abstract _tag: string;
-
-  // double dispatch pattern
-  public accept(visitor: Visitor<T>): void {
-    visitor.visit(this);
-  }
+/***
+class Shapes extends ExploreableClass {
+    public Square = "Square"
+    public Circle = "Circle"
+    accept() {
+        console.log("Circle")
+        console.log("Square")
+    }
+    toJSON() {
+        return JSON.stringify([this.Circle, this.Square])
+    }
 }
 
-class Tree {
-    node: any
-    left: Tree|null = null
-    right: Tree|null = null
+
+class ShapesExplorer extends ExplorerClass {
+
+    item: ExploreableClass
+    constructor(item: Shapes) {
+        super()
+        this.item = item
+    }
+
+    explore() {
+        this.item.accept()
+    }
 }
 
-class TreeVisitor implements AbstractVisitable<Tree> {
-    public _tag: string = "Tree"
 
-    accept(tree: Visitable<Tree>) {}
 
-}
-
-const tree1: Tree = {node: "string", left: null, right: null}
+const shapes = new Shapes()
+const explorer: ShapesExplorer = new ShapesExplorer(shapes)
+explorer.explore()
+shapes.toJSON()
+***/

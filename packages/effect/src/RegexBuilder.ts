@@ -2,11 +2,11 @@
  * @since 3.1.0
  */
 
-import * as Effect from "./Effect.js"
+//import * as Effect from "./Effect.js"
 import * as Arr from "./Array.js"
 import type * as _Cache from "./Cache.js"
 import * as Equal from "./Equal.js"
-import { format, type Inspectable, NodeInspectSymbol } from "./Inspectable.js"
+import { format, NodeInspectSymbol } from "./Inspectable.js"
 import { hasProperty } from "./Predicate.js"
 import * as Hash from "./Hash.js"
 import type { Mutable } from "./Types.js"
@@ -15,6 +15,7 @@ import * as internal from "./internal/regexBuilder/index.js"
 import { encodeSequence } from './internal/regexBuilder/encoder/encoder.js';
 import { ensureArray } from './internal/regexBuilder/utils/elements.js';
 import { RegexSequence, RegexFlags } from "./internal/regexBuilder/index.js"
+import * as Visitor from './Visitor.js'
 
 /**
  * @since 3.1.0
@@ -34,20 +35,11 @@ export type RegexBuilderTypeId = typeof RegexBuilderTypeId
  * @since 3.1.0
  * @category models
  */
-export interface RegexBuilder extends Equal.Equal, Inspectable {
+export interface RegexBuilder extends Equal.Equal, Visitor.Exploreable {
   readonly _tag: "RegexBuilder"
   readonly [RegexBuilderTypeId]: RegexBuilderTypeId
   readonly sequence: Readonly<RegexSequence>
   readonly flags: Readonly<RegexFlags>
-}
-
-
-
-const debug = (sequence: Readonly<RegexSequence>, level?: number) => {
-  let str = ""
-  for (let i = 0; i < level; i++) {
-    str += "\t"
-  }
 }
 
 const RegexBuilderProto: Omit<RegexBuilder, "sequence" | "flags"> = {
@@ -77,6 +69,8 @@ const RegexBuilderProto: Omit<RegexBuilder, "sequence" | "flags"> = {
       _tag: "RegexBuilder"
     }
   },
+
+  accept() {},
   [NodeInspectSymbol](this: RegexBuilder) {
     return this.toJSON()
   }
@@ -139,7 +133,6 @@ export const buildRegex = (elements: RegexSequence, flags?: RegexFlags): RegExp 
 export function buildPattern(sequence: RegexSequence): string {
   return encodeSequence(ensureArray(sequence)).pattern;
 }
-
 
 function encodeFlags(flags: RegexFlags): string {
   console.log('encodeFlags(%s)', flags)
